@@ -21,6 +21,8 @@ interface DrugItem {
   VALID_TERM: string
 }
 
+type Filter = '전체' | '정상' | '취소/취하'
+
 export default function Home() {
   const [query, setQuery] = useState('')
   const [searchType, setSearchType] = useState<'ingredient' | 'name'>('ingredient')
@@ -30,6 +32,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const [selected, setSelected] = useState<DrugItem | null>(null)
+  const [filter, setFilter] = useState<Filter>('정상')
   const numOfRows = 10
 
   const fetchPage = async (page: number) => {
@@ -55,6 +58,12 @@ export default function Home() {
     await fetchPage(1)
   }
 
+  const filteredItems = items.filter(item => {
+    if (filter === '전체') return true
+    if (filter === '정상') return item.CANCEL_NAME === '정상'
+    return item.CANCEL_NAME !== '정상'
+  })
+
   const totalPages = Math.ceil(total / numOfRows)
 
   const formatDate = (d: string) => {
@@ -72,6 +81,7 @@ export default function Home() {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '100vh', fontFamily: 'sans-serif' }}>
 
+      {/* 사이드바 */}
       <div style={{ background: '#f8f8f8', borderRight: '1px solid #e5e5e5', padding: '24px 16px' }}>
         <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 24 }}>PharmDash</div>
         <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>메뉴</div>
@@ -80,11 +90,13 @@ export default function Home() {
         <div style={{ padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 14, color: '#888' }}>파트너 목록</div>
       </div>
 
+      {/* 메인 */}
       <div style={{ padding: 32 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>의약품 개발 자동화 대시보드</h1>
         <p style={{ color: '#888', fontSize: 14, marginBottom: 24 }}>성분명 또는 품목명으로 허가사·제조사 정보를 조회합니다</p>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 32 }}>
+        {/* 검색창 */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <select
             value={searchType}
             onChange={e => setSearchType(e.target.value as 'ingredient' | 'name')}
@@ -108,18 +120,43 @@ export default function Home() {
           </button>
         </div>
 
+        {/* 필터 */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, alignItems: 'center' }}>
+          <span style={{ fontSize: 13, color: '#888' }}>필터:</span>
+          {(['전체', '정상', '취소/취하'] as Filter[]).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              style={{
+                padding: '4px 14px', border: '1px solid #e5e5e5', borderRadius: 20,
+                background: filter === f ? '#111' : '#fff',
+                color: filter === f ? '#fff' : '#888',
+                fontSize: 13, cursor: 'pointer'
+              }}
+            >
+              {f}
+            </button>
+          ))}
+          {searched && (
+            <span style={{ fontSize: 13, color: '#888', marginLeft: 8 }}>
+              총 <strong style={{ color: '#111' }}>{total}건</strong> 중 <strong style={{ color: '#111' }}>{filteredItems.length}건</strong> 표시
+            </span>
+          )}
+        </div>
+
+        {/* 결과 */}
         {searched && (
           <>
-            <div style={{ fontSize: 14, color: '#888', marginBottom: 16 }}>
-              총 <strong style={{ color: '#111' }}>{total}건</strong> 조회됨 · {pageNo}/{totalPages} 페이지 · 클릭하면 상세 정보를 볼 수 있습니다
+            <div style={{ fontSize: 13, color: '#888', marginBottom: 12 }}>
+              {pageNo}/{totalPages} 페이지 · 클릭하면 상세 정보를 볼 수 있습니다
             </div>
 
             <div style={{ display: 'grid', gap: 12, marginBottom: 24 }}>
-              {items.map(item => (
+              {filteredItems.map(item => (
                 <div
                   key={item.ITEM_SEQ}
                   onClick={() => setSelected(item)}
-                  style={{ border: '1px solid #e5e5e5', borderRadius: 12, padding: '16px 20px', background: '#fff', cursor: 'pointer' }}
+                  style={{ border: '1px solid #e5e5e5', borderRadius: 12, padding: '16px 20px', background: '#fff', cursor: 'pointer', opacity: item.CANCEL_NAME !== '정상' ? 0.6 : 1 }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                     <div>
@@ -158,7 +195,6 @@ export default function Home() {
                 >
                   이전
                 </button>
-
                 {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                   const start = Math.max(1, pageNo - 2)
                   const p = start + i
@@ -174,7 +210,6 @@ export default function Home() {
                     </button>
                   )
                 })}
-
                 <button
                   onClick={() => fetchPage(pageNo + 1)}
                   disabled={pageNo === totalPages || loading}
@@ -187,11 +222,12 @@ export default function Home() {
           </>
         )}
 
-        {searched && !loading && items.length === 0 && (
+        {searched && !loading && filteredItems.length === 0 && (
           <div style={{ textAlign: 'center', padding: 60, color: '#888' }}>검색 결과가 없습니다</div>
         )}
       </div>
 
+      {/* 상세 모달 */}
       {selected && (
         <div
           onClick={() => setSelected(null)}
