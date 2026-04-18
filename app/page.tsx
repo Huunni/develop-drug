@@ -26,26 +26,36 @@ export default function Home() {
   const [searchType, setSearchType] = useState<'ingredient' | 'name'>('ingredient')
   const [items, setItems] = useState<DrugItem[]>([])
   const [total, setTotal] = useState(0)
+  const [pageNo, setPageNo] = useState(1)
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const [selected, setSelected] = useState<DrugItem | null>(null)
+  const numOfRows = 10
 
-  const search = async () => {
+  const fetchPage = async (page: number) => {
     if (!query.trim()) return
     setLoading(true)
-    setSearched(true)
     try {
       const param = searchType === 'ingredient' ? `ingredient=${query}` : `name=${query}`
-      const res = await fetch(`/api/drug?${param}`)
+      const res = await fetch(`/api/drug?${param}&page=${page}`)
       const data = await res.json()
       setItems(data.items || [])
       setTotal(data.total || 0)
+      setPageNo(page)
     } catch {
       setItems([])
     } finally {
       setLoading(false)
     }
   }
+
+  const search = async () => {
+    setSearched(true)
+    setPageNo(1)
+    await fetchPage(1)
+  }
+
+  const totalPages = Math.ceil(total / numOfRows)
 
   const formatDate = (d: string) => {
     if (!d || d.length !== 8) return d
@@ -101,9 +111,10 @@ export default function Home() {
         {searched && (
           <>
             <div style={{ fontSize: 14, color: '#888', marginBottom: 16 }}>
-              총 <strong style={{ color: '#111' }}>{total}건</strong> 조회됨 · 클릭하면 상세 정보를 볼 수 있습니다
+              총 <strong style={{ color: '#111' }}>{total}건</strong> 조회됨 · {pageNo}/{totalPages} 페이지 · 클릭하면 상세 정보를 볼 수 있습니다
             </div>
-            <div style={{ display: 'grid', gap: 12 }}>
+
+            <div style={{ display: 'grid', gap: 12, marginBottom: 24 }}>
               {items.map(item => (
                 <div
                   key={item.ITEM_SEQ}
@@ -136,6 +147,43 @@ export default function Home() {
                 </div>
               ))}
             </div>
+
+            {/* 페이지네이션 */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center' }}>
+                <button
+                  onClick={() => fetchPage(pageNo - 1)}
+                  disabled={pageNo === 1 || loading}
+                  style={{ padding: '6px 14px', border: '1px solid #e5e5e5', borderRadius: 8, background: '#fff', cursor: pageNo === 1 ? 'not-allowed' : 'pointer', color: pageNo === 1 ? '#ccc' : '#111', fontSize: 14 }}
+                >
+                  이전
+                </button>
+
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  const start = Math.max(1, pageNo - 2)
+                  const p = start + i
+                  if (p > totalPages) return null
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => fetchPage(p)}
+                      disabled={loading}
+                      style={{ padding: '6px 12px', border: '1px solid #e5e5e5', borderRadius: 8, background: p === pageNo ? '#111' : '#fff', color: p === pageNo ? '#fff' : '#111', cursor: 'pointer', fontSize: 14 }}
+                    >
+                      {p}
+                    </button>
+                  )
+                })}
+
+                <button
+                  onClick={() => fetchPage(pageNo + 1)}
+                  disabled={pageNo === totalPages || loading}
+                  style={{ padding: '6px 14px', border: '1px solid #e5e5e5', borderRadius: 8, background: '#fff', cursor: pageNo === totalPages ? 'not-allowed' : 'pointer', color: pageNo === totalPages ? '#ccc' : '#111', fontSize: 14 }}
+                >
+                  다음
+                </button>
+              </div>
+            )}
           </>
         )}
 
@@ -190,7 +238,7 @@ export default function Home() {
               </>
             )}
 
-<button
+            <button
               onClick={() => window.open(`https://nedrug.mfds.go.kr/pbp/CCBBB01/getItemDetail?itemSeq=${selected.ITEM_SEQ}`, '_blank')}
               style={{ width: '100%', padding: '12px', background: '#111', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}
             >

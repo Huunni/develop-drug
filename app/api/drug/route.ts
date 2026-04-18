@@ -6,6 +6,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const ingredient = searchParams.get('ingredient')
   const name = searchParams.get('name')
+  const pageNo = Number(searchParams.get('page') || '1')
+  const numOfRows = 10
 
   if (!ingredient && !name) {
     return NextResponse.json({ error: '검색어를 입력해주세요' }, { status: 400 })
@@ -13,8 +15,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const items = ingredient
-      ? await searchDrugByIngredient(ingredient)
-      : await searchDrugByName(name!)
+      ? await searchDrugByIngredient(ingredient, pageNo, numOfRows)
+      : await searchDrugByName(name!, pageNo, numOfRows)
 
     await supabase.from('drug_search_history').insert({
       ingredient: ingredient || name,
@@ -40,7 +42,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ items, total: items.length })
+    return NextResponse.json({ items, total: items.length, pageNo, numOfRows })
 
   } catch (error: any) {
     console.error('API 에러 상세:', error.message, error.response?.data)
