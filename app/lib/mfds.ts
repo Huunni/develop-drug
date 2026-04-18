@@ -26,6 +26,10 @@ export async function searchDrugByIngredient(ingredient: string, pageNo = 1, num
   return fetchDrug({ ...baseParams(pageNo, numOfRows), ingr_eng_name: ingredient })
 }
 
+export async function searchDrugByIngredientKo(ingredient: string, pageNo = 1, numOfRows = 10) {
+  return fetchDrug({ ...baseParams(pageNo, numOfRows), ingr_name_kor: ingredient })
+}
+
 export async function searchDrugByName(itemName: string, pageNo = 1, numOfRows = 10) {
   return fetchDrug({ ...baseParams(pageNo, numOfRows), item_name: itemName })
 }

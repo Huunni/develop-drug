@@ -21,11 +21,12 @@ interface DrugItem {
   VALID_TERM: string
 }
 
-type SearchType = 'ingredient' | 'name' | 'licensor'
+type SearchType = 'ingredient' | 'ingredientKo' | 'name' | 'licensor'
 type Filter = '전체' | '정상' | '그 외'
 
 const SEARCH_TABS: { value: SearchType; label: string; placeholder: string }[] = [
   { value: 'ingredient', label: '성분명(영문)', placeholder: 'acetaminophen' },
+  { value: 'ingredientKo', label: '성분명(한글)', placeholder: '아세트아미노펜' },
   { value: 'name', label: '품목명(한글)', placeholder: '타이레놀' },
   { value: 'licensor', label: '업체명', placeholder: '한풍제약' },
 ]
