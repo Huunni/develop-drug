@@ -21,11 +21,19 @@ interface DrugItem {
   VALID_TERM: string
 }
 
-type Filter = '전체' | '정상' | '그 외' | '유효기간만료' | '취하' | '취소'
+type SearchType = 'ingredient' | 'name' | 'licensor' | 'maker'
+type Filter = '전체' | '정상' | '그 외'
+
+const SEARCH_TABS: { value: SearchType; label: string; placeholder: string }[] = [
+  { value: 'ingredient', label: '성분명(영문)', placeholder: 'acetaminophen' },
+  { value: 'name', label: '품목명(한글)', placeholder: '타이레놀' },
+  { value: 'licensor', label: '허가권자', placeholder: '일심제약' },
+  { value: 'maker', label: '제조원', placeholder: '한국신텍스제약' },
+]
 
 export default function Home() {
   const [query, setQuery] = useState('')
-  const [searchType, setSearchType] = useState<'ingredient' | 'name'>('ingredient')
+  const [searchType, setSearchType] = useState<SearchType>('ingredient')
   const [items, setItems] = useState<DrugItem[]>([])
   const [total, setTotal] = useState(0)
   const [pageNo, setPageNo] = useState(1)
@@ -33,14 +41,13 @@ export default function Home() {
   const [searched, setSearched] = useState(false)
   const [selected, setSelected] = useState<DrugItem | null>(null)
   const [filter, setFilter] = useState<Filter>('전체')
-  const [showSubFilter, setShowSubFilter] = useState(false)
   const numOfRows = 10
 
   const fetchPage = async (page: number) => {
     if (!query.trim()) return
     setLoading(true)
     try {
-      const param = searchType === 'ingredient' ? `ingredient=${query}` : `name=${query}`
+      const param = `${searchType}=${encodeURIComponent(query)}`
       const res = await fetch(`/api/drug?${param}&page=${page}`)
       const data = await res.json()
       setItems(data.items || [])
@@ -57,24 +64,16 @@ export default function Home() {
     setSearched(true)
     setPageNo(1)
     setFilter('전체')
-    setShowSubFilter(false)
     await fetchPage(1)
   }
 
   const filteredItems = items.filter(item => {
     if (filter === '전체') return true
     if (filter === '정상') return item.CANCEL_NAME === '정상'
-    if (filter === '그 외') return item.CANCEL_NAME !== '정상'
-    return item.CANCEL_NAME.includes(filter)
+    return item.CANCEL_NAME !== '정상'
   })
 
-  // 그 외 항목들 종류 추출
-  const cancelTypes = [...new Set(
-    items
-      .filter(i => i.CANCEL_NAME !== '정상')
-      .map(i => i.CANCEL_NAME)
-  )]
-
+  const cancelCount = items.filter(i => i.CANCEL_NAME !== '정상').length
   const totalPages = Math.ceil(total / numOfRows)
 
   const formatDate = (d: string) => {
@@ -89,15 +88,7 @@ export default function Home() {
     </div>
   )
 
-  const btnStyle = (active: boolean, sub = false) => ({
-    padding: sub ? '3px 12px' : '4px 14px',
-    border: '1px solid #e5e5e5',
-    borderRadius: 20,
-    background: active ? '#111' : '#fff',
-    color: active ? '#fff' : '#888',
-    fontSize: sub ? 12 : 13,
-    cursor: 'pointer' as const,
-  })
+  const currentTab = SEARCH_TABS.find(t => t.value === searchType)!
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '100vh', fontFamily: 'sans-serif' }}>
@@ -114,23 +105,38 @@ export default function Home() {
       {/* 메인 */}
       <div style={{ padding: 32 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>의약품 개발 자동화 대시보드</h1>
-        <p style={{ color: '#888', fontSize: 14, marginBottom: 24 }}>성분명 또는 품목명으로 허가사·제조사 정보를 조회합니다</p>
+        <p style={{ color: '#888', fontSize: 14, marginBottom: 24 }}>성분명·품목명·허가권자·제조원으로 허가 제품을 조회합니다</p>
+
+        {/* 검색 탭 */}
+        <div style={{ display: 'flex', gap: 0, marginBottom: 12, borderBottom: '1px solid #e5e5e5' }}>
+          {SEARCH_TABS.map(tab => (
+            <button
+              key={tab.value}
+              onClick={() => { setSearchType(tab.value); setQuery(''); setSearched(false) }}
+              style={{
+                padding: '8px 18px',
+                border: 'none',
+                borderBottom: searchType === tab.value ? '2px solid #111' : '2px solid transparent',
+                background: 'none',
+                fontSize: 14,
+                fontWeight: searchType === tab.value ? 600 : 400,
+                color: searchType === tab.value ? '#111' : '#888',
+                cursor: 'pointer',
+                marginBottom: -1,
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
         {/* 검색창 */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <select
-            value={searchType}
-            onChange={e => setSearchType(e.target.value as 'ingredient' | 'name')}
-            style={{ padding: '0 12px', height: 44, border: '1px solid #e5e5e5', borderRadius: 8, fontSize: 14, background: '#fff' }}
-          >
-            <option value="ingredient">성분명(영문)</option>
-            <option value="name">품목명(한글)</option>
-          </select>
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && search()}
-            placeholder={searchType === 'ingredient' ? 'acetaminophen' : '타이레놀'}
+            placeholder={currentTab.placeholder}
             style={{ flex: 1, padding: '0 16px', height: 44, border: '1px solid #e5e5e5', borderRadius: 8, fontSize: 14 }}
           />
           <button
@@ -141,42 +147,39 @@ export default function Home() {
           </button>
         </div>
 
+        {/* 탭별 안내 */}
+        {searchType === 'licensor' && (
+          <div style={{ fontSize: 13, color: '#888', marginBottom: 16, padding: '8px 12px', background: '#f8f8f8', borderRadius: 8 }}>
+            허가권자 검색 — 해당 업체가 보유한 허가 품목 전체를 조회합니다
+          </div>
+        )}
+        {searchType === 'maker' && (
+          <div style={{ fontSize: 13, color: '#888', marginBottom: 16, padding: '8px 12px', background: '#f8f8f8', borderRadius: 8 }}>
+            제조원 검색 — 해당 공장에서 생산하는 품목과 허가권자를 함께 확인할 수 있습니다
+          </div>
+        )}
+
         {/* 필터 */}
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 13, color: '#888' }}>필터:</span>
-            <button style={btnStyle(filter === '전체')} onClick={() => { setFilter('전체'); setShowSubFilter(false) }}>전체</button>
-            <button style={btnStyle(filter === '정상')} onClick={() => { setFilter('정상'); setShowSubFilter(false) }}>정상</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 24 }}>
+          <span style={{ fontSize: 13, color: '#888' }}>필터:</span>
+          {(['전체', '정상', '그 외'] as Filter[]).map(f => (
             <button
-              style={btnStyle(filter === '그 외' || showSubFilter || ['유효기간만료','취하','취소'].includes(filter))}
-              onClick={() => {
-                setShowSubFilter(!showSubFilter)
-                setFilter('그 외')
+              key={f}
+              onClick={() => setFilter(f)}
+              style={{
+                padding: '4px 14px', border: '1px solid #e5e5e5', borderRadius: 20,
+                background: filter === f ? '#111' : '#fff',
+                color: filter === f ? '#fff' : '#888',
+                fontSize: 13, cursor: 'pointer'
               }}
             >
-              그 외 {cancelTypes.length > 0 && `(${items.filter(i => i.CANCEL_NAME !== '정상').length})`} ▾
+              {f}{f === '그 외' && cancelCount > 0 ? ` (${cancelCount})` : ''}
             </button>
-            {searched && (
-              <span style={{ fontSize: 13, color: '#888', marginLeft: 4 }}>
-                총 <strong style={{ color: '#111' }}>{total}건</strong> 중 <strong style={{ color: '#111' }}>{filteredItems.length}건</strong> 표시
-              </span>
-            )}
-          </div>
-
-          {/* 서브 필터 */}
-          {showSubFilter && cancelTypes.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, paddingLeft: 48, alignItems: 'center' }}>
-              <button style={btnStyle(filter === '그 외', true)} onClick={() => setFilter('그 외')}>전체 그 외</button>
-              {cancelTypes.map(type => (
-                <button
-                  key={type}
-                  style={btnStyle(filter === type, true)}
-                  onClick={() => setFilter(type as Filter)}
-                >
-                  {type} ({items.filter(i => i.CANCEL_NAME === type).length})
-                </button>
-              ))}
-            </div>
+          ))}
+          {searched && (
+            <span style={{ fontSize: 13, color: '#888', marginLeft: 4 }}>
+              총 <strong style={{ color: '#111' }}>{total}건</strong> 중 <strong style={{ color: '#111' }}>{filteredItems.length}건</strong> 표시
+            </span>
           )}
         </div>
 
@@ -192,7 +195,11 @@ export default function Home() {
                 <div
                   key={item.ITEM_SEQ}
                   onClick={() => setSelected(item)}
-                  style={{ border: '1px solid #e5e5e5', borderRadius: 12, padding: '16px 20px', background: '#fff', cursor: 'pointer', opacity: item.CANCEL_NAME !== '정상' ? 0.6 : 1 }}
+                  style={{
+                    border: '1px solid #e5e5e5', borderRadius: 12, padding: '16px 20px',
+                    background: '#fff', cursor: 'pointer',
+                    opacity: item.CANCEL_NAME !== '정상' ? 0.6 : 1
+                  }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                     <div>
