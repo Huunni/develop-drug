@@ -1,65 +1,131 @@
-import Image from "next/image";
+'use client'
+
+import { useState } from 'react'
+
+interface DrugItem {
+  ITEM_SEQ: string
+  ITEM_NAME: string
+  ENTP_NAME: string
+  CNSGN_MANUF: string | null
+  ETC_OTC_CODE: string
+  FORM_CODE_NAME: string
+  PACK_UNIT: string
+  CANCEL_NAME: string
+}
 
 export default function Home() {
+  const [query, setQuery] = useState('')
+  const [searchType, setSearchType] = useState<'ingredient' | 'name'>('ingredient')
+  const [items, setItems] = useState<DrugItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [searched, setSearched] = useState(false)
+
+  const search = async () => {
+    if (!query.trim()) return
+    setLoading(true)
+    setSearched(true)
+    try {
+      const param = searchType === 'ingredient' ? `ingredient=${query}` : `name=${query}`
+      const res = await fetch(`/api/drug?${param}`)
+      const data = await res.json()
+      setItems(data.items || [])
+      setTotal(data.total || 0)
+    } catch {
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '100vh', fontFamily: 'sans-serif' }}>
+      
+      {/* 사이드바 */}
+      <div style={{ background: '#f8f8f8', borderRight: '1px solid #e5e5e5', padding: '24px 16px' }}>
+        <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 24 }}>PharmDash</div>
+        <div style={{ fontSize: 12, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>메뉴</div>
+        <div style={{ padding: '8px 12px', borderRadius: 8, background: '#fff', marginBottom: 4, cursor: 'pointer', fontSize: 14 }}>성분 검색</div>
+        <div style={{ padding: '8px 12px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', fontSize: 14, color: '#888' }}>엑셀 업로드</div>
+        <div style={{ padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 14, color: '#888' }}>파트너 목록</div>
+      </div>
+
+      {/* 메인 */}
+      <div style={{ padding: 32 }}>
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>의약품 개발 자동화 대시보드</h1>
+          <p style={{ color: '#888', fontSize: 14 }}>성분명 또는 품목명으로 허가사·제조사 정보를 조회합니다</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        {/* 검색창 */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 32 }}>
+          <select
+            value={searchType}
+            onChange={e => setSearchType(e.target.value as 'ingredient' | 'name')}
+            style={{ padding: '0 12px', height: 44, border: '1px solid #e5e5e5', borderRadius: 8, fontSize: 14, background: '#fff' }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <option value="ingredient">성분명(영문)</option>
+            <option value="name">품목명(한글)</option>
+          </select>
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && search()}
+            placeholder={searchType === 'ingredient' ? 'acetaminophen' : '타이레놀'}
+            style={{ flex: 1, padding: '0 16px', height: 44, border: '1px solid #e5e5e5', borderRadius: 8, fontSize: 14 }}
+          />
+          <button
+            onClick={search}
+            style={{ padding: '0 24px', height: 44, background: '#111', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}
           >
-            Documentation
-          </a>
+            {loading ? '검색 중...' : '조회'}
+          </button>
         </div>
-      </main>
+
+        {/* 결과 */}
+        {searched && (
+          <>
+            <div style={{ fontSize: 14, color: '#888', marginBottom: 16 }}>
+              총 <strong style={{ color: '#111' }}>{total}건</strong> 조회됨
+            </div>
+
+            <div style={{ display: 'grid', gap: 12 }}>
+              {items.map(item => (
+                <div key={item.ITEM_SEQ} style={{ border: '1px solid #e5e5e5', borderRadius: 12, padding: '16px 20px', background: '#fff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{item.ITEM_NAME}</div>
+                      <div style={{ fontSize: 13, color: '#888' }}>{item.ETC_OTC_CODE} · {item.PACK_UNIT}</div>
+                    </div>
+                    <span style={{
+                      fontSize: 12, padding: '3px 10px', borderRadius: 20,
+                      background: item.CANCEL_NAME === '정상' ? '#EAF3DE' : '#FCEBEB',
+                      color: item.CANCEL_NAME === '정상' ? '#27500A' : '#A32D2D'
+                    }}>
+                      {item.CANCEL_NAME}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div style={{ background: '#f8f8f8', borderRadius: 8, padding: '8px 12px' }}>
+                      <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>허가권자</div>
+                      <div style={{ fontSize: 14, fontWeight: 500 }}>{item.ENTP_NAME}</div>
+                    </div>
+                    <div style={{ background: '#f8f8f8', borderRadius: 8, padding: '8px 12px' }}>
+                      <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>제조원 (GMP)</div>
+                      <div style={{ fontSize: 14, fontWeight: 500 }}>{item.CNSGN_MANUF || '자체생산'}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {searched && !loading && items.length === 0 && (
+          <div style={{ textAlign: 'center', padding: 60, color: '#888' }}>검색 결과가 없습니다</div>
+        )}
+      </div>
     </div>
-  );
+  )
 }
