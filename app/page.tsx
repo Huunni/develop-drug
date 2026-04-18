@@ -49,29 +49,31 @@ export default function Home() {
 
   const formatDate = (d: string) => {
     if (!d || d.length !== 8) return d
-    return `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`
+    return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
   }
+
+  const Row = ({ label, value }: { label: string; value: string }) => (
+    <div style={{ background: '#f8f8f8', borderRadius: 8, padding: '10px 14px' }}>
+      <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 500 }}>{value || '-'}</div>
+    </div>
+  )
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '100vh', fontFamily: 'sans-serif' }}>
 
-      {/* 사이드바 */}
       <div style={{ background: '#f8f8f8', borderRight: '1px solid #e5e5e5', padding: '24px 16px' }}>
         <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 24 }}>PharmDash</div>
-        <div style={{ fontSize: 12, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>메뉴</div>
+        <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>메뉴</div>
         <div style={{ padding: '8px 12px', borderRadius: 8, background: '#fff', marginBottom: 4, cursor: 'pointer', fontSize: 14 }}>성분 검색</div>
         <div style={{ padding: '8px 12px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', fontSize: 14, color: '#888' }}>엑셀 업로드</div>
         <div style={{ padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 14, color: '#888' }}>파트너 목록</div>
       </div>
 
-      {/* 메인 */}
       <div style={{ padding: 32 }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>의약품 개발 자동화 대시보드</h1>
-          <p style={{ color: '#888', fontSize: 14 }}>성분명 또는 품목명으로 허가사·제조사 정보를 조회합니다</p>
-        </div>
+        <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>의약품 개발 자동화 대시보드</h1>
+        <p style={{ color: '#888', fontSize: 14, marginBottom: 24 }}>성분명 또는 품목명으로 허가사·제조사 정보를 조회합니다</p>
 
-        {/* 검색창 */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 32 }}>
           <select
             value={searchType}
@@ -96,7 +98,6 @@ export default function Home() {
           </button>
         </div>
 
-        {/* 결과 */}
         {searched && (
           <>
             <div style={{ fontSize: 14, color: '#888', marginBottom: 16 }}>
@@ -107,9 +108,7 @@ export default function Home() {
                 <div
                   key={item.ITEM_SEQ}
                   onClick={() => setSelected(item)}
-                  style={{ border: '1px solid #e5e5e5', borderRadius: 12, padding: '16px 20px', background: '#fff', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)')}
-                  onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+                  style={{ border: '1px solid #e5e5e5', borderRadius: 12, padding: '16px 20px', background: '#fff', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                     <div>
@@ -145,7 +144,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* 상세 모달 */}
       {selected && (
         <div
           onClick={() => setSelected(null)}
@@ -160,71 +158,44 @@ export default function Home() {
                 <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 4 }}>{selected.ITEM_NAME}</div>
                 <div style={{ fontSize: 13, color: '#888' }}>{selected.ITEM_ENG_NAME}</div>
               </div>
-              <button
-                onClick={() => setSelected(null)}
-                style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#888', padding: '0 4px' }}
-              >✕</button>
+              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#888' }}>✕</button>
             </div>
 
-            {/* 허가 정보 */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>허가 정보</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {[
-                  { label: '허가권자', value: selected.ENTP_NAME },
-                  { label: '허가권자(영문)', value: selected.ENTP_ENG_NAME },
-                  { label: '제조원', value: selected.CNSGN_MANUF || '자체생산' },
-                  { label: '허가일', value: formatDate(selected.ITEM_PERMIT_DATE) },
-                  { label: '품목구분', value: selected.ETC_OTC_CODE },
-                  { label: '취소여부', value: selected.CANCEL_NAME },
-                ].map(({ label, value }) => (
-                  <div key={label} style={{ background: '#f8f8f8', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>{label}</div>
-                    <div style={{ fontSize: 14, fontWeight: 500 }}>{value || '-'}</div>
-                  </div>
-                ))}
-              </div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 10 }}>허가 정보</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
+              <Row label="허가권자" value={selected.ENTP_NAME} />
+              <Row label="허가권자(영문)" value={selected.ENTP_ENG_NAME} />
+              <Row label="제조원" value={selected.CNSGN_MANUF || '자체생산'} />
+              <Row label="허가일" value={formatDate(selected.ITEM_PERMIT_DATE)} />
+              <Row label="품목구분" value={selected.ETC_OTC_CODE} />
+              <Row label="취소여부" value={selected.CANCEL_NAME} />
             </div>
 
-            {/* 제품 정보 */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>제품 정보</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {[
-                  { label: '포장단위', value: selected.PACK_UNIT },
-                  { label: 'ATC 코드', value: selected.ATC_CODE },
-                  { label: '주성분(영문)', value: selected.MAIN_INGR_ENG },
-                  { label: '저장방법', value: selected.STORAGE_METHOD },
-                  { label: '유효기간', value: selected.VALID_TERM },
-                  { label: '품목일련번호', value: selected.ITEM_SEQ },
-                ].map(({ label, value }) => (
-                  <div key={label} style={{ background: '#f8f8f8', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>{label}</div>
-                    <div style={{ fontSize: 14, fontWeight: 500 }}>{value || '-'}</div>
-                  </div>
-                ))}
-              </div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 10 }}>제품 정보</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
+              <Row label="포장단위" value={selected.PACK_UNIT} />
+              <Row label="ATC 코드" value={selected.ATC_CODE} />
+              <Row label="주성분(영문)" value={selected.MAIN_INGR_ENG} />
+              <Row label="저장방법" value={selected.STORAGE_METHOD} />
+              <Row label="유효기간" value={selected.VALID_TERM} />
+              <Row label="품목일련번호" value={selected.ITEM_SEQ} />
             </div>
 
-            {/* 성분 */}
             {selected.MATERIAL_NAME && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>성분 정보</div>
-                <div style={{ background: '#f8f8f8', borderRadius: 8, padding: '12px 14px', fontSize: 13, lineHeight: 1.7, color: '#444' }}>
+              <>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 10 }}>성분 정보</div>
+                <div style={{ background: '#f8f8f8', borderRadius: 8, padding: '12px 14px', fontSize: 13, lineHeight: 1.7, color: '#444', marginBottom: 20 }}>
                   {selected.MATERIAL_NAME}
                 </div>
-              </div>
+              </>
             )}
 
-            {/* 의약품안전나라 링크 */}
-            
-              href={`https://nedrug.mfds.go.kr/pbp/CCBBB01/getItemDetail?itemSeq=${selected.ITEM_SEQ}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: 'block', textAlign: 'center', padding: '12px', background: '#111', color: '#fff', borderRadius: 8, fontSize: 14, textDecoration: 'none' }}
+<button
+              onClick={() => window.open(`https://nedrug.mfds.go.kr/pbp/CCBBB01/getItemDetail?itemSeq=${selected.ITEM_SEQ}`, '_blank')}
+              style={{ width: '100%', padding: '12px', background: '#111', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}
             >
-              의약품안전나라에서 전체 정보 보기 →
-            </a>
+              의약품안전나라에서 전체 정보 보기
+            </button>
           </div>
         </div>
       )}
