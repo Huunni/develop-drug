@@ -21,7 +21,7 @@ interface DrugItem {
   VALID_TERM: string
 }
 
-type Filter = '전체' | '정상' | '취소/취하'
+type Filter = '전체' | '정상' | '그 외' | '유효기간만료' | '취하' | '취소'
 
 export default function Home() {
   const [query, setQuery] = useState('')
@@ -32,7 +32,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const [selected, setSelected] = useState<DrugItem | null>(null)
-  const [filter, setFilter] = useState<Filter>('정상')
+  const [filter, setFilter] = useState<Filter>('전체')
+  const [showSubFilter, setShowSubFilter] = useState(false)
   const numOfRows = 10
 
   const fetchPage = async (page: number) => {
@@ -55,14 +56,24 @@ export default function Home() {
   const search = async () => {
     setSearched(true)
     setPageNo(1)
+    setFilter('전체')
+    setShowSubFilter(false)
     await fetchPage(1)
   }
 
   const filteredItems = items.filter(item => {
     if (filter === '전체') return true
     if (filter === '정상') return item.CANCEL_NAME === '정상'
-    return item.CANCEL_NAME !== '정상'
+    if (filter === '그 외') return item.CANCEL_NAME !== '정상'
+    return item.CANCEL_NAME.includes(filter)
   })
+
+  // 그 외 항목들 종류 추출
+  const cancelTypes = [...new Set(
+    items
+      .filter(i => i.CANCEL_NAME !== '정상')
+      .map(i => i.CANCEL_NAME)
+  )]
 
   const totalPages = Math.ceil(total / numOfRows)
 
@@ -77,6 +88,16 @@ export default function Home() {
       <div style={{ fontSize: 14, fontWeight: 500 }}>{value || '-'}</div>
     </div>
   )
+
+  const btnStyle = (active: boolean, sub = false) => ({
+    padding: sub ? '3px 12px' : '4px 14px',
+    border: '1px solid #e5e5e5',
+    borderRadius: 20,
+    background: active ? '#111' : '#fff',
+    color: active ? '#fff' : '#888',
+    fontSize: sub ? 12 : 13,
+    cursor: 'pointer' as const,
+  })
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '100vh', fontFamily: 'sans-serif' }}>
@@ -121,26 +142,41 @@ export default function Home() {
         </div>
 
         {/* 필터 */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24, alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: '#888' }}>필터:</span>
-          {(['전체', '정상', '취소/취하'] as Filter[]).map(f => (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 13, color: '#888' }}>필터:</span>
+            <button style={btnStyle(filter === '전체')} onClick={() => { setFilter('전체'); setShowSubFilter(false) }}>전체</button>
+            <button style={btnStyle(filter === '정상')} onClick={() => { setFilter('정상'); setShowSubFilter(false) }}>정상</button>
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              style={{
-                padding: '4px 14px', border: '1px solid #e5e5e5', borderRadius: 20,
-                background: filter === f ? '#111' : '#fff',
-                color: filter === f ? '#fff' : '#888',
-                fontSize: 13, cursor: 'pointer'
+              style={btnStyle(filter === '그 외' || showSubFilter || ['유효기간만료','취하','취소'].includes(filter))}
+              onClick={() => {
+                setShowSubFilter(!showSubFilter)
+                setFilter('그 외')
               }}
             >
-              {f}
+              그 외 {cancelTypes.length > 0 && `(${items.filter(i => i.CANCEL_NAME !== '정상').length})`} ▾
             </button>
-          ))}
-          {searched && (
-            <span style={{ fontSize: 13, color: '#888', marginLeft: 8 }}>
-              총 <strong style={{ color: '#111' }}>{total}건</strong> 중 <strong style={{ color: '#111' }}>{filteredItems.length}건</strong> 표시
-            </span>
+            {searched && (
+              <span style={{ fontSize: 13, color: '#888', marginLeft: 4 }}>
+                총 <strong style={{ color: '#111' }}>{total}건</strong> 중 <strong style={{ color: '#111' }}>{filteredItems.length}건</strong> 표시
+              </span>
+            )}
+          </div>
+
+          {/* 서브 필터 */}
+          {showSubFilter && cancelTypes.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, paddingLeft: 48, alignItems: 'center' }}>
+              <button style={btnStyle(filter === '그 외', true)} onClick={() => setFilter('그 외')}>전체 그 외</button>
+              {cancelTypes.map(type => (
+                <button
+                  key={type}
+                  style={btnStyle(filter === type, true)}
+                  onClick={() => setFilter(type as Filter)}
+                >
+                  {type} ({items.filter(i => i.CANCEL_NAME === type).length})
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -148,7 +184,7 @@ export default function Home() {
         {searched && (
           <>
             <div style={{ fontSize: 13, color: '#888', marginBottom: 12 }}>
-              {pageNo}/{totalPages} 페이지 · 클릭하면 상세 정보를 볼 수 있습니다
+              {pageNo}/{totalPages || 1} 페이지 · 클릭하면 상세 정보를 볼 수 있습니다
             </div>
 
             <div style={{ display: 'grid', gap: 12, marginBottom: 24 }}>
