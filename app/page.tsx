@@ -24,6 +24,7 @@ interface DrugItem {
 type SearchType = 'ingredient' | 'ingredientKo' | 'name' | 'licensor'
 type Filter = '전체' | '정상' | '그 외'
 type TypeFilter = '전체' | '단일제' | '복합제'
+type OtcFilter = '전체' | '전문' | '일반'
 
 const SEARCH_TABS: { value: SearchType; label: string; placeholder: string }[] = [
   { value: 'ingredient', label: '성분명(영문)', placeholder: 'acetaminophen' },
@@ -44,19 +45,28 @@ export default function Home() {
   const [selected, setSelected] = useState<DrugItem | null>(null)
   const [filter, setFilter] = useState<Filter>('전체')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('전체')
+  const [otcFilter, setOtcFilter] = useState<OtcFilter>('전체')
   const [market, setMarket] = useState<any>(null)
 
-  const fetchPage = async (page: number, rows?: number, cancelF?: Filter, typeF?: TypeFilter) => {
+  const fetchPage = async (
+    page: number,
+    rows?: number,
+    cancelF?: Filter,
+    typeF?: TypeFilter,
+    otcF?: OtcFilter
+  ) => {
     if (!query.trim()) return
     setLoading(true)
     const rowCount = rows ?? numOfRows
     const cancelFilter = cancelF ?? filter
     const tf = typeF ?? typeFilter
+    const otc = otcF ?? otcFilter
     try {
       const param = `${searchType}=${encodeURIComponent(query)}`
       const cancelParam = cancelFilter !== '전체' ? `&cancel=${encodeURIComponent(cancelFilter)}` : ''
       const typeParam = tf === '단일제' ? '&type=single' : tf === '복합제' ? '&type=complex' : ''
-      const res = await fetch(`/api/drug?${param}&page=${page}&rows=${rowCount}${cancelParam}${typeParam}`)
+      const otcParam = otc === '전문' ? '&otc=전문의약품' : otc === '일반' ? '&otc=일반의약품' : ''
+      const res = await fetch(`/api/drug?${param}&page=${page}&rows=${rowCount}${cancelParam}${typeParam}${otcParam}`)
       const data = await res.json()
       setItems(data.items || [])
       setTotal(data.total || 0)
@@ -87,8 +97,9 @@ export default function Home() {
     setPageNo(1)
     setFilter('전체')
     setTypeFilter('전체')
+    setOtcFilter('전체')
     setMarket(null)
-    await fetchPage(1, numOfRows, '전체', '전체')
+    await fetchPage(1, numOfRows, '전체', '전체', '전체')
     await fetchMarket(query, searchType)
   }
 
@@ -115,6 +126,22 @@ export default function Home() {
   const currentTab = SEARCH_TABS.find(t => t.value === searchType)!
   const normalCount = items.filter(i => i.CANCEL_NAME === '정상').length
   const cancelCount = items.filter(i => i.CANCEL_NAME !== '정상').length
+
+  const FilterBtn = ({
+    label, active, color, onClick
+  }: { label: string; active: boolean; color?: string; onClick: () => void }) => (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '3px 10px', border: '1px solid #e5e5e5', borderRadius: 20,
+        background: active ? (color || '#111') : '#fff',
+        color: active ? '#fff' : '#888',
+        fontSize: 12, cursor: 'pointer'
+      }}
+    >
+      {label}
+    </button>
+  )
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '100vh', fontFamily: 'sans-serif' }}>
@@ -231,41 +258,40 @@ export default function Home() {
                 <div style={{ fontSize: 12, color: '#888' }}>총 {total}건</div>
               </div>
 
-              {/* 필터들 */}
-              <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-                {/* 단일/복합 필터 */}
-                {(['전체', '단일제', '복합제'] as TypeFilter[]).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => { setTypeFilter(f); fetchPage(1, numOfRows, filter, f) }}
-                    style={{
-                      padding: '3px 10px', border: '1px solid #e5e5e5', borderRadius: 20,
-                      background: typeFilter === f ? '#3b82f6' : '#fff',
-                      color: typeFilter === f ? '#fff' : '#888',
-                      fontSize: 12, cursor: 'pointer'
-                    }}
-                  >
-                    {f}
-                  </button>
-                ))}
+              {/* 필터 그룹 */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {/* 단일/복합 */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: '#888', width: 36 }}>제형</span>
+                  {(['전체', '단일제', '복합제'] as TypeFilter[]).map(f => (
+                    <FilterBtn
+                      key={f} label={f} active={typeFilter === f} color="#3b82f6"
+                      onClick={() => { setTypeFilter(f); fetchPage(1, numOfRows, filter, f, otcFilter) }}
+                    />
+                  ))}
+                </div>
 
-                <div style={{ width: 1, background: '#e5e5e5', margin: '0 2px' }} />
+                {/* 전문/일반 */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: '#888', width: 36 }}>구분</span>
+                  {(['전체', '전문', '일반'] as OtcFilter[]).map(f => (
+                    <FilterBtn
+                      key={f} label={f} active={otcFilter === f} color="#8b5cf6"
+                      onClick={() => { setOtcFilter(f); fetchPage(1, numOfRows, filter, typeFilter, f) }}
+                    />
+                  ))}
+                </div>
 
-                {/* 정상/취소 필터 */}
-                {(['전체', '정상', '그 외'] as Filter[]).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => { setFilter(f); fetchPage(1, numOfRows, f, typeFilter) }}
-                    style={{
-                      padding: '3px 10px', border: '1px solid #e5e5e5', borderRadius: 20,
-                      background: filter === f ? '#111' : '#fff',
-                      color: filter === f ? '#fff' : '#888',
-                      fontSize: 12, cursor: 'pointer'
-                    }}
-                  >
-                    {f}
-                  </button>
-                ))}
+                {/* 정상/취소 */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: '#888', width: 36 }}>상태</span>
+                  {(['전체', '정상', '그 외'] as Filter[]).map(f => (
+                    <FilterBtn
+                      key={f} label={f} active={filter === f}
+                      onClick={() => { setFilter(f); fetchPage(1, numOfRows, f, typeFilter, otcFilter) }}
+                    />
+                  ))}
+                </div>
               </div>
 
               {/* 정상/취소 요약 */}
@@ -317,7 +343,7 @@ export default function Home() {
                       </div>
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                         {item.MAIN_INGR_ENG && item.MAIN_INGR_ENG.includes('/') && (
-                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#f0f0f0', color: '#666' }}>복합제</span>
+                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#ede9fe', color: '#6d28d9' }}>복합제</span>
                         )}
                         <span style={{
                           fontSize: 11, padding: '2px 8px', borderRadius: 20,

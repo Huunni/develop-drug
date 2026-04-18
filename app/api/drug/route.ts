@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
   const pageNo = Number(searchParams.get('page') || '1')
   const numOfRows = Number(searchParams.get('rows') || '10')
   const cancelFilter = searchParams.get('cancel')
-  const typeFilter = searchParams.get('type') // 'single' | 'complex'
+  const typeFilter = searchParams.get('type')
+  const otcFilter = searchParams.get('otc')
 
   if (!ingredient && !ingredientKo && !name && !licensor) {
     return NextResponse.json({ error: '검색어를 입력해주세요' }, { status: 400 })
@@ -41,6 +42,10 @@ export async function GET(req: NextRequest) {
       query = query.not('main_ingr_eng', 'ilike', '%/%')
     } else if (typeFilter === 'complex') {
       query = query.ilike('main_ingr_eng', '%/%')
+    }
+
+    if (otcFilter) {
+      query = query.eq('etc_otc_code', otcFilter)
     }
 
     const from = (pageNo - 1) * numOfRows
