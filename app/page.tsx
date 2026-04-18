@@ -93,8 +93,6 @@ export default function Home() {
     fetchPage(1, newRows)
   }
 
-  const filteredItems = items
-  const cancelCount = items.filter(i => i.CANCEL_NAME !== '정상').length
   const totalPages = Math.ceil(total / numOfRows)
 
   const formatDate = (d: string) => {
@@ -111,16 +109,21 @@ export default function Home() {
 
   const currentTab = SEARCH_TABS.find(t => t.value === searchType)!
 
+  // 정상/취소 카운트
+  const normalCount = items.filter(i => i.CANCEL_NAME === '정상').length
+  const cancelCount = items.filter(i => i.CANCEL_NAME !== '정상').length
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '100vh', fontFamily: 'sans-serif' }}>
 
-{/* 사이드바 */}
+      {/* 사이드바 */}
       <div style={{ background: '#f8f8f8', borderRight: '1px solid #e5e5e5', padding: '24px 16px' }}>
         <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 24 }}>PharmDash</div>
         <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>메뉴</div>
         <a href="/" style={{ display: 'block', padding: '8px 12px', borderRadius: 8, background: '#fff', marginBottom: 4, cursor: 'pointer', fontSize: 14, textDecoration: 'none', color: '#111' }}>성분 검색</a>
         <a href="#" style={{ display: 'block', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 14, textDecoration: 'none', color: '#888' }}>파트너 목록</a>
       </div>
+
       {/* 메인 */}
       <div style={{ padding: 32 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>의약품 개발 자동화 대시보드</h1>
@@ -133,15 +136,12 @@ export default function Home() {
               key={tab.value}
               onClick={() => { setSearchType(tab.value); setQuery(''); setSearched(false); setMarket(null) }}
               style={{
-                padding: '8px 18px',
-                border: 'none',
+                padding: '8px 18px', border: 'none',
                 borderBottom: searchType === tab.value ? '2px solid #111' : '2px solid transparent',
-                background: 'none',
-                fontSize: 14,
+                background: 'none', fontSize: 14,
                 fontWeight: searchType === tab.value ? 600 : 400,
                 color: searchType === tab.value ? '#111' : '#888',
-                cursor: 'pointer',
-                marginBottom: -1,
+                cursor: 'pointer', marginBottom: -1,
               }}
             >
               {tab.label}
@@ -150,7 +150,7 @@ export default function Home() {
         </div>
 
         {/* 검색창 */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
@@ -166,174 +166,195 @@ export default function Home() {
           </button>
         </div>
 
-        {/* 필터 + 페이지당 건수 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 13, color: '#888' }}>필터:</span>
-            {(['전체', '정상', '그 외'] as Filter[]).map(f => (
-              <button
-                key={f}
-                onClick={() => {
-                  setFilter(f)
-                  if (searched) fetchPage(1, numOfRows, f)
-                }}
-                style={{
-                  padding: '4px 14px', border: '1px solid #e5e5e5', borderRadius: 20,
-                  background: filter === f ? '#111' : '#fff',
-                  color: filter === f ? '#fff' : '#888',
-                  fontSize: 13, cursor: 'pointer'
-                }}
-              >
-                {f}{f === '그 외' && cancelCount > 0 ? ` (${cancelCount})` : ''}
-              </button>
-            ))}
-            {searched && (
-              <span style={{ fontSize: 13, color: '#888', marginLeft: 4 }}>
-                총 <strong style={{ color: '#111' }}>{total}건</strong>
-              </span>
-            )}
-          </div>
+        {/* 좌우 분리 레이아웃 */}
+        {searched && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
 
-          {/* 페이지당 건수 */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: 13, color: '#888' }}>페이지당:</span>
-            {[10, 20, 50, 100].map(n => (
-              <button
-                key={n}
-                onClick={() => handleRowsChange(n)}
-                style={{
-                  padding: '4px 10px', border: '1px solid #e5e5e5', borderRadius: 20,
-                  background: numOfRows === n ? '#111' : '#fff',
-                  color: numOfRows === n ? '#fff' : '#888',
-                  fontSize: 13, cursor: 'pointer'
-                }}
-              >
-                {n}개
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 시장 분석 */}
-        {market && market.totalItems > 0 && (
-          <div style={{ marginBottom: 24, padding: '20px 24px', background: '#f0f7ff', borderRadius: 12, border: '1px solid #d0e4f7' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, color: '#1a4a7a' }}>시장 분석</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
-              {[
-                { label: '연간 시장규모', value: `${(market.annualMarket / 100000000).toFixed(1)}억원` },
-                { label: '경쟁 품목 수', value: `${market.totalItems}개` },
-                { label: '월평균 공급량', value: `${Math.round(market.totalMonthlyAvg).toLocaleString()}EA` },
-                { label: '공급가 중앙값', value: `${Math.round(market.medianPrice).toLocaleString()}원` },
-              ].map(({ label, value }) => (
-                <div key={label} style={{ background: '#fff', borderRadius: 8, padding: '12px 16px' }}>
-                  <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{label}</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#111' }}>{value}</div>
-                </div>
-              ))}
-            </div>
+            {/* 왼쪽: 시장 분석 */}
             <div>
-              <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>판매사 TOP 5 (월평균 공급량 기준)</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {market.topSellers.map((s: any, i: number) => (
-                  <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: '#888', width: 16 }}>{i + 1}</span>
-                    <span style={{ fontSize: 13, flex: 1 }}>{s.name}</span>
-                    <span style={{ fontSize: 13, color: '#444' }}>{Math.round(s.monthly_avg).toLocaleString()}EA/월</span>
-                    <span style={{ fontSize: 12, color: '#888' }}>({(s.annual / 100000000).toFixed(2)}억/년)</span>
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16, color: '#111' }}>시장 분석</div>
+
+              {market && market.totalItems > 0 ? (
+                <>
+                  {/* 핵심 지표 */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+                    {[
+                      { label: '연간 시장규모', value: `${(market.annualMarket / 100000000).toFixed(1)}억원` },
+                      { label: '경쟁 품목 수', value: `${market.totalItems}개` },
+                      { label: '월평균 공급량', value: `${Math.round(market.totalMonthlyAvg).toLocaleString()}EA` },
+                      { label: '공급가 중앙값', value: `${Math.round(market.medianPrice).toLocaleString()}원` },
+                    ].map(({ label, value }) => (
+                      <div key={label} style={{ background: '#f0f7ff', borderRadius: 10, padding: '14px 16px', border: '1px solid #d0e4f7' }}>
+                        <div style={{ fontSize: 11, color: '#666', marginBottom: 6 }}>{label}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: '#1a4a7a' }}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 판매사 TOP5 */}
+                  <div style={{ background: '#fff', border: '1px solid #e5e5e5', borderRadius: 10, padding: '16px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 12 }}>판매사 TOP 5</div>
+                    {market.topSellers.map((s: any, i: number) => {
+                      const maxVal = market.topSellers[0]?.monthly_avg || 1
+                      const pct = Math.round((s.monthly_avg / maxVal) * 100)
+                      return (
+                        <div key={s.name} style={{ marginBottom: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontSize: 13 }}>{i + 1}. {s.name}</span>
+                            <span style={{ fontSize: 12, color: '#888' }}>{(s.annual / 100000000).toFixed(1)}억/년</span>
+                          </div>
+                          <div style={{ background: '#f0f0f0', borderRadius: 4, height: 6 }}>
+                            <div style={{ background: '#3b82f6', borderRadius: 4, height: 6, width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {market.latestPeriod && (
+                      <div style={{ fontSize: 11, color: '#999', marginTop: 8 }}>기준: {market.latestPeriod}</div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div style={{ background: '#f8f8f8', borderRadius: 10, padding: 24, textAlign: 'center', color: '#888', fontSize: 14 }}>
+                  {searchType === 'ingredient' || searchType === 'ingredientKo'
+                    ? '시장 데이터가 없습니다'
+                    : '성분명으로 검색하면 시장분석이 표시됩니다'}
+                </div>
+              )}
+            </div>
+
+            {/* 오른쪽: 파트너 매칭 */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>파트너 매칭</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(['전체', '정상', '그 외'] as Filter[]).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => { setFilter(f); fetchPage(1, numOfRows, f) }}
+                      style={{
+                        padding: '3px 10px', border: '1px solid #e5e5e5', borderRadius: 20,
+                        background: filter === f ? '#111' : '#fff',
+                        color: filter === f ? '#fff' : '#888',
+                        fontSize: 12, cursor: 'pointer'
+                      }}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 정상/취소 요약 */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <div style={{ flex: 1, background: '#EAF3DE', borderRadius: 8, padding: '8px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: '#27500A' }}>정상</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#27500A' }}>{normalCount}개</div>
+                </div>
+                <div style={{ flex: 1, background: '#FCEBEB', borderRadius: 8, padding: '8px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: '#A32D2D' }}>취소/취하</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#A32D2D' }}>{cancelCount}개</div>
+                </div>
+                <div style={{ flex: 1, background: '#f8f8f8', borderRadius: 8, padding: '8px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: '#888' }}>전체</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#111' }}>{total}개</div>
+                </div>
+              </div>
+
+              {/* 페이지당 건수 */}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 12, justifyContent: 'flex-end' }}>
+                {[10, 20, 50].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => handleRowsChange(n)}
+                    style={{
+                      padding: '3px 10px', border: '1px solid #e5e5e5', borderRadius: 20,
+                      background: numOfRows === n ? '#111' : '#fff',
+                      color: numOfRows === n ? '#fff' : '#888',
+                      fontSize: 12, cursor: 'pointer'
+                    }}
+                  >
+                    {n}개
+                  </button>
+                ))}
+              </div>
+
+              {/* 카드 목록 */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                {items.map(item => (
+                  <div
+                    key={item.ITEM_SEQ}
+                    onClick={() => setSelected(item)}
+                    style={{
+                      border: '1px solid #e5e5e5', borderRadius: 10, padding: '12px 16px',
+                      background: '#fff', cursor: 'pointer',
+                      opacity: item.CANCEL_NAME !== '정상' ? 0.6 : 1
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{item.ITEM_NAME}</div>
+                        <div style={{ fontSize: 12, color: '#888' }}>{item.ETC_OTC_CODE}</div>
+                      </div>
+                      <span style={{
+                        fontSize: 11, padding: '2px 8px', borderRadius: 20,
+                        background: item.CANCEL_NAME === '정상' ? '#EAF3DE' : '#FCEBEB',
+                        color: item.CANCEL_NAME === '정상' ? '#27500A' : '#A32D2D'
+                      }}>
+                        {item.CANCEL_NAME}
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <div style={{ background: '#f8f8f8', borderRadius: 6, padding: '6px 10px' }}>
+                        <div style={{ fontSize: 10, color: '#888', marginBottom: 1 }}>허가권자</div>
+                        <div style={{ fontSize: 12, fontWeight: 500 }}>{item.ENTP_NAME}</div>
+                      </div>
+                      <div style={{ background: '#f8f8f8', borderRadius: 6, padding: '6px 10px' }}>
+                        <div style={{ fontSize: 10, color: '#888', marginBottom: 1 }}>제조원</div>
+                        <div style={{ fontSize: 12, fontWeight: 500 }}>{item.CNSGN_MANUF || '자체생산'}</div>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
+
+              {/* 페이지네이션 */}
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 4 }}>
+                  <button
+                    onClick={() => fetchPage(pageNo - 1)}
+                    disabled={pageNo === 1 || loading}
+                    style={{ padding: '4px 10px', border: '1px solid #e5e5e5', borderRadius: 6, background: '#fff', cursor: pageNo === 1 ? 'not-allowed' : 'pointer', color: pageNo === 1 ? '#ccc' : '#111', fontSize: 13 }}
+                  >이전</button>
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    const start = Math.max(1, pageNo - 2)
+                    const p = start + i
+                    if (p > totalPages) return null
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => fetchPage(p)}
+                        style={{ padding: '4px 10px', border: '1px solid #e5e5e5', borderRadius: 6, background: p === pageNo ? '#111' : '#fff', color: p === pageNo ? '#fff' : '#111', cursor: 'pointer', fontSize: 13 }}
+                      >{p}</button>
+                    )
+                  })}
+                  <button
+                    onClick={() => fetchPage(pageNo + 1)}
+                    disabled={pageNo === totalPages || loading}
+                    style={{ padding: '4px 10px', border: '1px solid #e5e5e5', borderRadius: 6, background: '#fff', cursor: pageNo === totalPages ? 'not-allowed' : 'pointer', color: pageNo === totalPages ? '#ccc' : '#111', fontSize: 13 }}
+                  >다음</button>
+                </div>
+              )}
             </div>
-            {market.latestPeriod && (
-              <div style={{ fontSize: 11, color: '#999', marginTop: 12 }}>데이터 기준: {market.latestPeriod}</div>
-            )}
           </div>
         )}
 
-        {/* 결과 */}
-        {searched && (
-          <>
-            <div style={{ fontSize: 13, color: '#888', marginBottom: 12 }}>
-              {pageNo}/{totalPages || 1} 페이지 · 클릭하면 상세 정보를 볼 수 있습니다
-            </div>
-
-            <div style={{ display: 'grid', gap: 12, marginBottom: 24 }}>
-              {filteredItems.map(item => (
-                <div
-                  key={item.ITEM_SEQ}
-                  onClick={() => setSelected(item)}
-                  style={{
-                    border: '1px solid #e5e5e5', borderRadius: 12, padding: '16px 20px',
-                    background: '#fff', cursor: 'pointer',
-                    opacity: item.CANCEL_NAME !== '정상' ? 0.6 : 1
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{item.ITEM_NAME}</div>
-                      <div style={{ fontSize: 13, color: '#888' }}>{item.ETC_OTC_CODE} · {item.PACK_UNIT}</div>
-                    </div>
-                    <span style={{
-                      fontSize: 12, padding: '3px 10px', borderRadius: 20,
-                      background: item.CANCEL_NAME === '정상' ? '#EAF3DE' : '#FCEBEB',
-                      color: item.CANCEL_NAME === '정상' ? '#27500A' : '#A32D2D'
-                    }}>
-                      {item.CANCEL_NAME}
-                    </span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <div style={{ background: '#f8f8f8', borderRadius: 8, padding: '8px 12px' }}>
-                      <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>허가권자</div>
-                      <div style={{ fontSize: 14, fontWeight: 500 }}>{item.ENTP_NAME}</div>
-                    </div>
-                    <div style={{ background: '#f8f8f8', borderRadius: 8, padding: '8px 12px' }}>
-                      <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>제조원 (GMP)</div>
-                      <div style={{ fontSize: 14, fontWeight: 500 }}>{item.CNSGN_MANUF || '자체생산'}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* 페이지네이션 */}
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center' }}>
-                <button
-                  onClick={() => fetchPage(pageNo - 1)}
-                  disabled={pageNo === 1 || loading}
-                  style={{ padding: '6px 14px', border: '1px solid #e5e5e5', borderRadius: 8, background: '#fff', cursor: pageNo === 1 ? 'not-allowed' : 'pointer', color: pageNo === 1 ? '#ccc' : '#111', fontSize: 14 }}
-                >
-                  이전
-                </button>
-                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                  const start = Math.max(1, pageNo - 2)
-                  const p = start + i
-                  if (p > totalPages) return null
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => fetchPage(p)}
-                      disabled={loading}
-                      style={{ padding: '6px 12px', border: '1px solid #e5e5e5', borderRadius: 8, background: p === pageNo ? '#111' : '#fff', color: p === pageNo ? '#fff' : '#111', cursor: 'pointer', fontSize: 14 }}
-                    >
-                      {p}
-                    </button>
-                  )
-                })}
-                <button
-                  onClick={() => fetchPage(pageNo + 1)}
-                  disabled={pageNo === totalPages || loading}
-                  style={{ padding: '6px 14px', border: '1px solid #e5e5e5', borderRadius: 8, background: '#fff', cursor: pageNo === totalPages ? 'not-allowed' : 'pointer', color: pageNo === totalPages ? '#ccc' : '#111', fontSize: 14 }}
-                >
-                  다음
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-        {searched && !loading && filteredItems.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 60, color: '#888' }}>검색 결과가 없습니다</div>
+        {!searched && (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#888' }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>💊</div>
+            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 8 }}>성분명을 검색해보세요</div>
+            <div style={{ fontSize: 14 }}>시장분석과 파트너 매칭 정보를 한눈에 확인할 수 있습니다</div>
+          </div>
         )}
       </div>
 
