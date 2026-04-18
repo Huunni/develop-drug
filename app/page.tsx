@@ -42,8 +42,9 @@ export default function Home() {
   const [searched, setSearched] = useState(false)
   const [selected, setSelected] = useState<DrugItem | null>(null)
   const [filter, setFilter] = useState<Filter>('전체')
+  const [market, setMarket] = useState<any>(null)
 
-const fetchPage = async (page: number, rows?: number, cancelF?: Filter) => {
+  const fetchPage = async (page: number, rows?: number, cancelF?: Filter) => {
     if (!query.trim()) return
     setLoading(true)
     const rowCount = rows ?? numOfRows
@@ -63,11 +64,27 @@ const fetchPage = async (page: number, rows?: number, cancelF?: Filter) => {
     }
   }
 
+  const fetchMarket = async (q: string, type: SearchType) => {
+    if (type !== 'ingredient' && type !== 'ingredientKo') return
+    try {
+      const param = type === 'ingredientKo'
+        ? `ingredientKo=${encodeURIComponent(q)}`
+        : `ingredientEng=${encodeURIComponent(q)}`
+      const res = await fetch(`/api/market?${param}`)
+      const data = await res.json()
+      setMarket(data)
+    } catch {
+      setMarket(null)
+    }
+  }
+
   const search = async () => {
     setSearched(true)
     setPageNo(1)
     setFilter('전체')
+    setMarket(null)
     await fetchPage(1)
+    await fetchMarket(query, searchType)
   }
 
   const handleRowsChange = (newRows: number) => {
@@ -76,12 +93,7 @@ const fetchPage = async (page: number, rows?: number, cancelF?: Filter) => {
     fetchPage(1, newRows)
   }
 
-  const filteredItems = items.filter(item => {
-    if (filter === '전체') return true
-    if (filter === '정상') return item.CANCEL_NAME === '정상'
-    return item.CANCEL_NAME !== '정상'
-  })
-
+  const filteredItems = items
   const cancelCount = items.filter(i => i.CANCEL_NAME !== '정상').length
   const totalPages = Math.ceil(total / numOfRows)
 
@@ -121,7 +133,7 @@ const fetchPage = async (page: number, rows?: number, cancelF?: Filter) => {
           {SEARCH_TABS.map(tab => (
             <button
               key={tab.value}
-              onClick={() => { setSearchType(tab.value); setQuery(''); setSearched(false) }}
+              onClick={() => { setSearchType(tab.value); setQuery(''); setSearched(false); setMarket(null) }}
               style={{
                 padding: '8px 18px',
                 border: 'none',
@@ -160,7 +172,7 @@ const fetchPage = async (page: number, rows?: number, cancelF?: Filter) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 13, color: '#888' }}>필터:</span>
-{(['전체', '정상', '그 외'] as Filter[]).map(f => (
+            {(['전체', '정상', '그 외'] as Filter[]).map(f => (
               <button
                 key={f}
                 onClick={() => {
@@ -174,12 +186,12 @@ const fetchPage = async (page: number, rows?: number, cancelF?: Filter) => {
                   fontSize: 13, cursor: 'pointer'
                 }}
               >
-                {f}
+                {f}{f === '그 외' && cancelCount > 0 ? ` (${cancelCount})` : ''}
               </button>
             ))}
             {searched && (
               <span style={{ fontSize: 13, color: '#888', marginLeft: 4 }}>
-                총 <strong style={{ color: '#111' }}>{total}건</strong> 중 <strong style={{ color: '#111' }}>{filteredItems.length}건</strong> 표시
+                총 <strong style={{ color: '#111' }}>{total}건</strong>
               </span>
             )}
           </div>
@@ -203,6 +215,42 @@ const fetchPage = async (page: number, rows?: number, cancelF?: Filter) => {
             ))}
           </div>
         </div>
+
+        {/* 시장 분석 */}
+        {market && market.totalItems > 0 && (
+          <div style={{ marginBottom: 24, padding: '20px 24px', background: '#f0f7ff', borderRadius: 12, border: '1px solid #d0e4f7' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, color: '#1a4a7a' }}>시장 분석</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+              {[
+                { label: '연간 시장규모', value: `${(market.annualMarket / 100000000).toFixed(1)}억원` },
+                { label: '경쟁 품목 수', value: `${market.totalItems}개` },
+                { label: '월평균 공급량', value: `${Math.round(market.totalMonthlyAvg).toLocaleString()}EA` },
+                { label: '공급가 중앙값', value: `${Math.round(market.medianPrice).toLocaleString()}원` },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ background: '#fff', borderRadius: 8, padding: '12px 16px' }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#111' }}>{value}</div>
+                </div>
+              ))}
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>판매사 TOP 5 (월평균 공급량 기준)</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {market.topSellers.map((s: any, i: number) => (
+                  <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: '#888', width: 16 }}>{i + 1}</span>
+                    <span style={{ fontSize: 13, flex: 1 }}>{s.name}</span>
+                    <span style={{ fontSize: 13, color: '#444' }}>{Math.round(s.monthly_avg).toLocaleString()}EA/월</span>
+                    <span style={{ fontSize: 12, color: '#888' }}>({(s.annual / 100000000).toFixed(2)}억/년)</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {market.latestPeriod && (
+              <div style={{ fontSize: 11, color: '#999', marginTop: 12 }}>데이터 기준: {market.latestPeriod}</div>
+            )}
+          </div>
+        )}
 
         {/* 결과 */}
         {searched && (
