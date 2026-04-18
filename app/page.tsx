@@ -114,13 +114,13 @@ export default function Home() {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '100vh', fontFamily: 'sans-serif' }}>
 
-      {/* 사이드바 */}
+{/* 사이드바 */}
       <div style={{ background: '#f8f8f8', borderRight: '1px solid #e5e5e5', padding: '24px 16px' }}>
         <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 24 }}>PharmDash</div>
         <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>메뉴</div>
-        <div style={{ padding: '8px 12px', borderRadius: 8, background: '#fff', marginBottom: 4, cursor: 'pointer', fontSize: 14 }}>성분 검색</div>
-        <div style={{ padding: '8px 12px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', fontSize: 14, color: '#888' }}>엑셀 업로드</div>
-        <div style={{ padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 14, color: '#888' }}>파트너 목록</div>
+        <a href="/" style={{ display: 'block', padding: '8px 12px', borderRadius: 8, background: '#fff', marginBottom: 4, cursor: 'pointer', fontSize: 14, textDecoration: 'none', color: '#111' }}>성분 검색</a>
+        <a href="/upload" style={{ display: 'block', padding: '8px 12px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', fontSize: 14, textDecoration: 'none', color: '#888' }}>엑셀 업로드</a>
+        <a href="#" style={{ display: 'block', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 14, textDecoration: 'none', color: '#888' }}>파트너 목록</a>
       </div>
 
       {/* 메인 */}
