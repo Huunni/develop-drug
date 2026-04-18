@@ -43,13 +43,15 @@ export default function Home() {
   const [selected, setSelected] = useState<DrugItem | null>(null)
   const [filter, setFilter] = useState<Filter>('전체')
 
-  const fetchPage = async (page: number, rows?: number) => {
+const fetchPage = async (page: number, rows?: number, cancelF?: Filter) => {
     if (!query.trim()) return
     setLoading(true)
     const rowCount = rows ?? numOfRows
+    const cancelFilter = cancelF ?? filter
     try {
       const param = `${searchType}=${encodeURIComponent(query)}`
-      const res = await fetch(`/api/drug?${param}&page=${page}&rows=${rowCount}`)
+      const cancelParam = cancelFilter !== '전체' ? `&cancel=${encodeURIComponent(cancelFilter)}` : ''
+      const res = await fetch(`/api/drug?${param}&page=${page}&rows=${rowCount}${cancelParam}`)
       const data = await res.json()
       setItems(data.items || [])
       setTotal(data.total || 0)
@@ -158,10 +160,13 @@ export default function Home() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 13, color: '#888' }}>필터:</span>
-            {(['전체', '정상', '그 외'] as Filter[]).map(f => (
+{(['전체', '정상', '그 외'] as Filter[]).map(f => (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
+                onClick={() => {
+                  setFilter(f)
+                  if (searched) fetchPage(1, numOfRows, f)
+                }}
                 style={{
                   padding: '4px 14px', border: '1px solid #e5e5e5', borderRadius: 20,
                   background: filter === f ? '#111' : '#fff',
@@ -169,7 +174,7 @@ export default function Home() {
                   fontSize: 13, cursor: 'pointer'
                 }}
               >
-                {f}{f === '그 외' && cancelCount > 0 ? ` (${cancelCount})` : ''}
+                {f}
               </button>
             ))}
             {searched && (
