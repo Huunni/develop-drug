@@ -21,14 +21,13 @@ interface DrugItem {
   VALID_TERM: string
 }
 
-type SearchType = 'ingredient' | 'name' | 'licensor' | 'maker'
+type SearchType = 'ingredient' | 'name' | 'licensor'
 type Filter = '전체' | '정상' | '그 외'
 
 const SEARCH_TABS: { value: SearchType; label: string; placeholder: string }[] = [
   { value: 'ingredient', label: '성분명(영문)', placeholder: 'acetaminophen' },
   { value: 'name', label: '품목명(한글)', placeholder: '타이레놀' },
-  { value: 'licensor', label: '허가권자', placeholder: '일심제약' },
-  { value: 'maker', label: '제조원', placeholder: '한국신텍스제약' },
+  { value: 'licensor', label: '업체명', placeholder: '한풍제약' },
 ]
 
 export default function Home() {
@@ -37,18 +36,19 @@ export default function Home() {
   const [items, setItems] = useState<DrugItem[]>([])
   const [total, setTotal] = useState(0)
   const [pageNo, setPageNo] = useState(1)
+  const [numOfRows, setNumOfRows] = useState(10)
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const [selected, setSelected] = useState<DrugItem | null>(null)
   const [filter, setFilter] = useState<Filter>('전체')
-  const numOfRows = 10
 
-  const fetchPage = async (page: number) => {
+  const fetchPage = async (page: number, rows?: number) => {
     if (!query.trim()) return
     setLoading(true)
+    const rowCount = rows ?? numOfRows
     try {
       const param = `${searchType}=${encodeURIComponent(query)}`
-      const res = await fetch(`/api/drug?${param}&page=${page}`)
+      const res = await fetch(`/api/drug?${param}&page=${page}&rows=${rowCount}`)
       const data = await res.json()
       setItems(data.items || [])
       setTotal(data.total || 0)
@@ -65,6 +65,12 @@ export default function Home() {
     setPageNo(1)
     setFilter('전체')
     await fetchPage(1)
+  }
+
+  const handleRowsChange = (newRows: number) => {
+    setNumOfRows(newRows)
+    setPageNo(1)
+    fetchPage(1, newRows)
   }
 
   const filteredItems = items.filter(item => {
@@ -105,7 +111,7 @@ export default function Home() {
       {/* 메인 */}
       <div style={{ padding: 32 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>의약품 개발 자동화 대시보드</h1>
-        <p style={{ color: '#888', fontSize: 14, marginBottom: 24 }}>성분명·품목명·허가권자·제조원으로 허가 제품을 조회합니다</p>
+        <p style={{ color: '#888', fontSize: 14, marginBottom: 24 }}>성분명·품목명·업체명으로 허가 제품을 조회합니다</p>
 
         {/* 검색 탭 */}
         <div style={{ display: 'flex', gap: 0, marginBottom: 12, borderBottom: '1px solid #e5e5e5' }}>
@@ -147,40 +153,49 @@ export default function Home() {
           </button>
         </div>
 
-        {/* 탭별 안내 */}
-        {searchType === 'licensor' && (
-          <div style={{ fontSize: 13, color: '#888', marginBottom: 16, padding: '8px 12px', background: '#f8f8f8', borderRadius: 8 }}>
-            허가권자 검색 — 해당 업체가 보유한 허가 품목 전체를 조회합니다
+        {/* 필터 + 페이지당 건수 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, color: '#888' }}>필터:</span>
+            {(['전체', '정상', '그 외'] as Filter[]).map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                style={{
+                  padding: '4px 14px', border: '1px solid #e5e5e5', borderRadius: 20,
+                  background: filter === f ? '#111' : '#fff',
+                  color: filter === f ? '#fff' : '#888',
+                  fontSize: 13, cursor: 'pointer'
+                }}
+              >
+                {f}{f === '그 외' && cancelCount > 0 ? ` (${cancelCount})` : ''}
+              </button>
+            ))}
+            {searched && (
+              <span style={{ fontSize: 13, color: '#888', marginLeft: 4 }}>
+                총 <strong style={{ color: '#111' }}>{total}건</strong> 중 <strong style={{ color: '#111' }}>{filteredItems.length}건</strong> 표시
+              </span>
+            )}
           </div>
-        )}
-        {searchType === 'maker' && (
-          <div style={{ fontSize: 13, color: '#888', marginBottom: 16, padding: '8px 12px', background: '#f8f8f8', borderRadius: 8 }}>
-            제조원 검색 — 해당 공장에서 생산하는 품목과 허가권자를 함께 확인할 수 있습니다
-          </div>
-        )}
 
-        {/* 필터 */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 24 }}>
-          <span style={{ fontSize: 13, color: '#888' }}>필터:</span>
-          {(['전체', '정상', '그 외'] as Filter[]).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              style={{
-                padding: '4px 14px', border: '1px solid #e5e5e5', borderRadius: 20,
-                background: filter === f ? '#111' : '#fff',
-                color: filter === f ? '#fff' : '#888',
-                fontSize: 13, cursor: 'pointer'
-              }}
-            >
-              {f}{f === '그 외' && cancelCount > 0 ? ` (${cancelCount})` : ''}
-            </button>
-          ))}
-          {searched && (
-            <span style={{ fontSize: 13, color: '#888', marginLeft: 4 }}>
-              총 <strong style={{ color: '#111' }}>{total}건</strong> 중 <strong style={{ color: '#111' }}>{filteredItems.length}건</strong> 표시
-            </span>
-          )}
+          {/* 페이지당 건수 */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, color: '#888' }}>페이지당:</span>
+            {[10, 20, 50, 100].map(n => (
+              <button
+                key={n}
+                onClick={() => handleRowsChange(n)}
+                style={{
+                  padding: '4px 10px', border: '1px solid #e5e5e5', borderRadius: 20,
+                  background: numOfRows === n ? '#111' : '#fff',
+                  color: numOfRows === n ? '#fff' : '#888',
+                  fontSize: 13, cursor: 'pointer'
+                }}
+              >
+                {n}개
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* 결과 */}

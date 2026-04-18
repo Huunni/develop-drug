@@ -33,7 +33,3 @@ export async function searchDrugByName(itemName: string, pageNo = 1, numOfRows =
 export async function searchDrugByLicensor(entpName: string, pageNo = 1, numOfRows = 10) {
   return fetchDrug({ ...baseParams(pageNo, numOfRows), entp_name: entpName })
 }
-
-export async function searchDrugByMaker(makerName: string, pageNo = 1, numOfRows = 10) {
-  return fetchDrug({ ...baseParams(pageNo, numOfRows), entp_name: makerName })
-}
