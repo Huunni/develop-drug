@@ -119,10 +119,8 @@ export default function Home() {
         <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 24 }}>PharmDash</div>
         <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>메뉴</div>
         <a href="/" style={{ display: 'block', padding: '8px 12px', borderRadius: 8, background: '#fff', marginBottom: 4, cursor: 'pointer', fontSize: 14, textDecoration: 'none', color: '#111' }}>성분 검색</a>
-        <a href="/upload" style={{ display: 'block', padding: '8px 12px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', fontSize: 14, textDecoration: 'none', color: '#888' }}>엑셀 업로드</a>
         <a href="#" style={{ display: 'block', padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 14, textDecoration: 'none', color: '#888' }}>파트너 목록</a>
       </div>
-
       {/* 메인 */}
       <div style={{ padding: 32 }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>의약품 개발 자동화 대시보드</h1>
