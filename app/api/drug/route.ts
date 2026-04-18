@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
   const pageNo = Number(searchParams.get('page') || '1')
   const numOfRows = Number(searchParams.get('rows') || '10')
   const cancelFilter = searchParams.get('cancel')
+  const typeFilter = searchParams.get('type') // 'single' | 'complex'
 
   if (!ingredient && !ingredientKo && !name && !licensor) {
     return NextResponse.json({ error: '검색어를 입력해주세요' }, { status: 400 })
@@ -34,6 +35,12 @@ export async function GET(req: NextRequest) {
       query = query.eq('cancel_name', '정상')
     } else if (cancelFilter === '그 외') {
       query = query.neq('cancel_name', '정상')
+    }
+
+    if (typeFilter === 'single') {
+      query = query.not('main_ingr_eng', 'ilike', '%/%')
+    } else if (typeFilter === 'complex') {
+      query = query.ilike('main_ingr_eng', '%/%')
     }
 
     const from = (pageNo - 1) * numOfRows

@@ -23,6 +23,7 @@ interface DrugItem {
 
 type SearchType = 'ingredient' | 'ingredientKo' | 'name' | 'licensor'
 type Filter = '전체' | '정상' | '그 외'
+type TypeFilter = '전체' | '단일제' | '복합제'
 
 const SEARCH_TABS: { value: SearchType; label: string; placeholder: string }[] = [
   { value: 'ingredient', label: '성분명(영문)', placeholder: 'acetaminophen' },
@@ -42,17 +43,20 @@ export default function Home() {
   const [searched, setSearched] = useState(false)
   const [selected, setSelected] = useState<DrugItem | null>(null)
   const [filter, setFilter] = useState<Filter>('전체')
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('전체')
   const [market, setMarket] = useState<any>(null)
 
-  const fetchPage = async (page: number, rows?: number, cancelF?: Filter) => {
+  const fetchPage = async (page: number, rows?: number, cancelF?: Filter, typeF?: TypeFilter) => {
     if (!query.trim()) return
     setLoading(true)
     const rowCount = rows ?? numOfRows
     const cancelFilter = cancelF ?? filter
+    const tf = typeF ?? typeFilter
     try {
       const param = `${searchType}=${encodeURIComponent(query)}`
       const cancelParam = cancelFilter !== '전체' ? `&cancel=${encodeURIComponent(cancelFilter)}` : ''
-      const res = await fetch(`/api/drug?${param}&page=${page}&rows=${rowCount}${cancelParam}`)
+      const typeParam = tf === '단일제' ? '&type=single' : tf === '복합제' ? '&type=complex' : ''
+      const res = await fetch(`/api/drug?${param}&page=${page}&rows=${rowCount}${cancelParam}${typeParam}`)
       const data = await res.json()
       setItems(data.items || [])
       setTotal(data.total || 0)
@@ -82,8 +86,9 @@ export default function Home() {
     setSearched(true)
     setPageNo(1)
     setFilter('전체')
+    setTypeFilter('전체')
     setMarket(null)
-    await fetchPage(1)
+    await fetchPage(1, numOfRows, '전체', '전체')
     await fetchMarket(query, searchType)
   }
 
@@ -108,8 +113,6 @@ export default function Home() {
   )
 
   const currentTab = SEARCH_TABS.find(t => t.value === searchType)!
-
-  // 정상/취소 카운트
   const normalCount = items.filter(i => i.CANCEL_NAME === '정상').length
   const cancelCount = items.filter(i => i.CANCEL_NAME !== '정상').length
 
@@ -176,7 +179,6 @@ export default function Home() {
 
               {market && market.totalItems > 0 ? (
                 <>
-                  {/* 핵심 지표 */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
                     {[
                       { label: '연간 시장규모', value: `${(market.annualMarket / 100000000).toFixed(1)}억원` },
@@ -191,8 +193,7 @@ export default function Home() {
                     ))}
                   </div>
 
-                  {/* 판매사 TOP5 */}
-                  <div style={{ background: '#fff', border: '1px solid #e5e5e5', borderRadius: 10, padding: '16px' }}>
+                  <div style={{ background: '#fff', border: '1px solid #e5e5e5', borderRadius: 10, padding: 16 }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 12 }}>판매사 TOP 5</div>
                     {market.topSellers.map((s: any, i: number) => {
                       const maxVal = market.topSellers[0]?.monthly_avg || 1
@@ -225,24 +226,46 @@ export default function Home() {
 
             {/* 오른쪽: 파트너 매칭 */}
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>파트너 매칭</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {(['전체', '정상', '그 외'] as Filter[]).map(f => (
-                    <button
-                      key={f}
-                      onClick={() => { setFilter(f); fetchPage(1, numOfRows, f) }}
-                      style={{
-                        padding: '3px 10px', border: '1px solid #e5e5e5', borderRadius: 20,
-                        background: filter === f ? '#111' : '#fff',
-                        color: filter === f ? '#fff' : '#888',
-                        fontSize: 12, cursor: 'pointer'
-                      }}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
+                <div style={{ fontSize: 12, color: '#888' }}>총 {total}건</div>
+              </div>
+
+              {/* 필터들 */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+                {/* 단일/복합 필터 */}
+                {(['전체', '단일제', '복합제'] as TypeFilter[]).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => { setTypeFilter(f); fetchPage(1, numOfRows, filter, f) }}
+                    style={{
+                      padding: '3px 10px', border: '1px solid #e5e5e5', borderRadius: 20,
+                      background: typeFilter === f ? '#3b82f6' : '#fff',
+                      color: typeFilter === f ? '#fff' : '#888',
+                      fontSize: 12, cursor: 'pointer'
+                    }}
+                  >
+                    {f}
+                  </button>
+                ))}
+
+                <div style={{ width: 1, background: '#e5e5e5', margin: '0 2px' }} />
+
+                {/* 정상/취소 필터 */}
+                {(['전체', '정상', '그 외'] as Filter[]).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => { setFilter(f); fetchPage(1, numOfRows, f, typeFilter) }}
+                    style={{
+                      padding: '3px 10px', border: '1px solid #e5e5e5', borderRadius: 20,
+                      background: filter === f ? '#111' : '#fff',
+                      color: filter === f ? '#fff' : '#888',
+                      fontSize: 12, cursor: 'pointer'
+                    }}
+                  >
+                    {f}
+                  </button>
+                ))}
               </div>
 
               {/* 정상/취소 요약 */}
@@ -254,10 +277,6 @@ export default function Home() {
                 <div style={{ flex: 1, background: '#FCEBEB', borderRadius: 8, padding: '8px 12px', textAlign: 'center' }}>
                   <div style={{ fontSize: 11, color: '#A32D2D' }}>취소/취하</div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: '#A32D2D' }}>{cancelCount}개</div>
-                </div>
-                <div style={{ flex: 1, background: '#f8f8f8', borderRadius: 8, padding: '8px 12px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: '#888' }}>전체</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#111' }}>{total}개</div>
                 </div>
               </div>
 
@@ -296,13 +315,18 @@ export default function Home() {
                         <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{item.ITEM_NAME}</div>
                         <div style={{ fontSize: 12, color: '#888' }}>{item.ETC_OTC_CODE}</div>
                       </div>
-                      <span style={{
-                        fontSize: 11, padding: '2px 8px', borderRadius: 20,
-                        background: item.CANCEL_NAME === '정상' ? '#EAF3DE' : '#FCEBEB',
-                        color: item.CANCEL_NAME === '정상' ? '#27500A' : '#A32D2D'
-                      }}>
-                        {item.CANCEL_NAME}
-                      </span>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        {item.MAIN_INGR_ENG && item.MAIN_INGR_ENG.includes('/') && (
+                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#f0f0f0', color: '#666' }}>복합제</span>
+                        )}
+                        <span style={{
+                          fontSize: 11, padding: '2px 8px', borderRadius: 20,
+                          background: item.CANCEL_NAME === '정상' ? '#EAF3DE' : '#FCEBEB',
+                          color: item.CANCEL_NAME === '정상' ? '#27500A' : '#A32D2D'
+                        }}>
+                          {item.CANCEL_NAME}
+                        </span>
+                      </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                       <div style={{ background: '#f8f8f8', borderRadius: 6, padding: '6px 10px' }}>
