@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const name = searchParams.get('name')
   const licensor = searchParams.get('licensor')
   const pageNo = Number(searchParams.get('page') || '1')
-  const numOfRows = 10
+  const numOfRows = Number(searchParams.get('rows') || '10')
 
   if (!ingredient && !name && !licensor) {
     return NextResponse.json({ error: '검색어를 입력해주세요' }, { status: 400 })
