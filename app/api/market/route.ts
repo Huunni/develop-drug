@@ -44,12 +44,12 @@ export async function GET(req: NextRequest) {
     const minPrice = prices.length > 0 ? prices[0] : 0
     const avgPrice = prices.length > 0 ? Math.round(prices.reduce((s, p) => s + p, 0) / prices.length) : 0
 
-    // 판매사 TOP5
+// 제품명 TOP5
     const sellerMap = new Map<string, number>()
     items.forEach(item => {
-      const seller = item.seller_name || '기타'
+      const productName = item.item_name || item.seller_name || '기타'
       const itemTotal = monthCols.reduce((s, col) => s + (Number(item[col]) || 0), 0)
-      sellerMap.set(seller, (sellerMap.get(seller) || 0) + itemTotal)
+      sellerMap.set(productName, (sellerMap.get(productName) || 0) + itemTotal)
     })
     const topSellers = Array.from(sellerMap.entries())
       .sort((a, b) => b[1] - a[1])
