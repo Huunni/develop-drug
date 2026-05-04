@@ -21,6 +21,14 @@ interface DrugItem {
   VALID_TERM: string
 }
 
+interface TopProduct {
+  name: string
+  annual: number
+  avgPrice: number
+  minPrice: number
+  sharePct: number
+}
+
 interface PackUnit {
   spec: string
   qty: string
@@ -28,6 +36,8 @@ interface PackUnit {
   minPrice: number
   avgPrice: number
   count: number
+  packAnnual: number
+  topProducts: TopProduct[]
 }
 
 interface MarketData {
@@ -36,7 +46,7 @@ interface MarketData {
   medianPrice: number
   minPrice: number
   avgPrice: number
-  topSellers: { name: string; annual: number }[]
+  topSellers: { name: string; annual: number; avgPrice: number; minPrice: number }[]
   topAtc: string
   latestPeriod: string
   packUnits: PackUnit[]
@@ -48,8 +58,6 @@ interface Candidate {
   ingredient: string
   market: MarketData
   addedAt: string
-  etcCount: number
-  otcCount: number
 }
 
 type SearchType = 'ingredient' | 'ingredientKo' | 'name' | 'licensor'
@@ -119,6 +127,67 @@ function BatchCalculator({ medianPrice, marketShare, annualMarket }: {
   )
 }
 
+function PackMarketPanel({ pack, annualMarket }: { pack: PackUnit; annualMarket: number }) {
+  const [expandedProduct, setExpandedProduct] = useState<string | null>(null)
+  const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+
+  return (
+    <div style={{ background: '#f0f7ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: 16, marginTop: 8 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, color: '#1a4a7a' }}>
+        📦 {pack.spec} / {pack.qty}개 {pack.pkg} 시장
+      </div>
+      <div style={{ fontSize: 12, color: '#666', marginBottom: 12 }}>
+        규격 시장규모: {(pack.packAnnual / 100000000).toFixed(1)}억원 · 전체 시장의 {annualMarket > 0 ? (pack.packAnnual / annualMarket * 100).toFixed(1) : 0}%
+      </div>
+
+      {pack.topProducts.map((p, i) => (
+        <div key={p.name} style={{ marginBottom: 8 }}>
+          <div
+            onClick={() => setExpandedProduct(expandedProduct === p.name ? null : p.name)}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#fff', borderRadius: 8, cursor: 'pointer', border: expandedProduct === p.name ? `1px solid ${colors[i]}` : '1px solid #e5e5e5' }}>
+            <div style={{ width: 22, height: 22, borderRadius: '50%', background: colors[i], display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+              {i + 1}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</span>
+                <span style={{ fontSize: 12, color: '#888' }}>
+                  {(p.annual / 100000000).toFixed(1)}억/년 · {p.sharePct.toFixed(1)}%
+                </span>
+              </div>
+              <div style={{ background: '#e5e5e5', borderRadius: 4, height: 5 }}>
+                <div style={{ background: colors[i], borderRadius: 4, height: 5, width: `${p.sharePct}%` }} />
+              </div>
+              <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+                <span style={{ fontSize: 11, color: '#ef4444' }}>최저 {p.minPrice.toLocaleString()}원</span>
+                <span style={{ fontSize: 11, color: '#3b82f6' }}>평균 {p.avgPrice.toLocaleString()}원</span>
+              </div>
+            </div>
+            <span style={{ fontSize: 11, color: '#888' }}>{expandedProduct === p.name ? '▲' : '계산기 ▼'}</span>
+          </div>
+          {expandedProduct === p.name && (
+            <BatchCalculator
+              medianPrice={p.avgPrice}
+              marketShare={p.sharePct}
+              annualMarket={pack.packAnnual}
+            />
+          )}
+        </div>
+      ))}
+
+      {/* 내가 진입한다면 */}
+      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: 16, marginTop: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, color: '#92400e' }}>💡 이 규격으로 5% 점유한다면?</div>
+        <BatchCalculator
+          medianPrice={pack.avgPrice}
+          marketShare={5}
+          annualMarket={pack.packAnnual}
+        />
+      </div>
+    </div>
+  )
+}
+
 export default function Home() {
   const [menu, setMenu] = useState<MenuType>('search')
   const [query, setQuery] = useState('')
@@ -139,9 +208,7 @@ export default function Home() {
   const [toast, setToast] = useState('')
   const [expandedCandidate, setExpandedCandidate] = useState<string | null>(null)
   const [expandedSeller, setExpandedSeller] = useState<string | null>(null)
-  const [selectedPack, setSelectedPack] = useState<PackUnit | null>(null)
-
-  // 개발후보 자체 검색
+  const [expandedPack, setExpandedPack] = useState<string | null>(null)
   const [candQuery, setCandQuery] = useState('')
   const [candLoading, setCandLoading] = useState(false)
 
@@ -181,21 +248,9 @@ export default function Home() {
         ? `ingredientKo=${encodeURIComponent(q)}`
         : `ingredientEng=${encodeURIComponent(q)}`
       const res = await fetch(`/api/market?${param}`)
-      const data = await res.json()
-      return data
+      return await res.json()
     } catch {
       return null
-    }
-  }
-
-  const fetchEtcOtc = async (q: string): Promise<{ etcCount: number; otcCount: number }> => {
-    try {
-      const res = await fetch(`/api/drug?ingredientKo=${encodeURIComponent(q)}&page=1&rows=1`)
-      const data = await res.json()
-      // drug_products에서 전문/일반 카운트 별도 API 없으므로 임시로 0
-      return { etcCount: 0, otcCount: 0 }
-    } catch {
-      return { etcCount: 0, otcCount: 0 }
     }
   }
 
@@ -225,8 +280,6 @@ export default function Home() {
       ingredient: ingredientName,
       market: marketData,
       addedAt: new Date().toLocaleDateString('ko-KR'),
-      etcCount: 0,
-      otcCount: 0,
     }])
     showToast(`✅ "${ingredientName}" 개발 후보에 추가됐어요!`)
   }
@@ -280,9 +333,6 @@ export default function Home() {
       color: active ? '#fff' : '#888', fontSize: 12, cursor: 'pointer'
     }}>{label}</button>
   )
-
-  const topSeller = market?.topSellers?.[0]
-  const totalTopSales = market?.topSellers?.reduce((s, t) => s + t.annual, 0) || 0
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '100vh', fontFamily: 'sans-serif' }}>
@@ -347,8 +397,7 @@ export default function Home() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                     <div style={{ fontSize: 15, fontWeight: 600 }}>시장 분석</div>
                     {market && market.totalItems > 0 && (
-                      <button
-                        onClick={() => addCandidate(currentIngredient, market)}
+                      <button onClick={() => addCandidate(currentIngredient, market)}
                         style={{ padding: '6px 14px', background: candidates.find(c => c.ingredient === currentIngredient) ? '#e5e5e5' : '#111', color: candidates.find(c => c.ingredient === currentIngredient) ? '#888' : '#fff', border: 'none', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
                         {candidates.find(c => c.ingredient === currentIngredient) ? '✅ 후보 추가됨' : '＋ 개발 후보로 추가'}
                       </button>
@@ -371,26 +420,8 @@ export default function Home() {
                         ))}
                       </div>
 
-                      {/* 포장단위별 가격 */}
-                      {market.packUnits && market.packUnits.length > 0 && (
-                        <div style={{ background: '#fff', border: '1px solid #e5e5e5', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 10 }}>포장단위별 공급가</div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, fontSize: 11, color: '#888', marginBottom: 6, padding: '0 4px' }}>
-                            <span>규격</span><span>포장</span><span>최저가</span><span>평균가</span>
-                          </div>
-                          {market.packUnits.slice(0, 8).map((p, i) => (
-                            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, padding: '6px 4px', borderTop: '1px solid #f0f0f0', fontSize: 13 }}>
-                              <span style={{ fontWeight: 500 }}>{p.spec}</span>
-                              <span style={{ color: '#666' }}>{p.qty}{p.pkg ? ` ${p.pkg}` : ''}</span>
-                              <span style={{ color: '#ef4444', fontWeight: 600 }}>{p.minPrice.toLocaleString()}원</span>
-                              <span style={{ color: '#3b82f6', fontWeight: 600 }}>{p.avgPrice.toLocaleString()}원</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      <div style={{ background: '#fff', border: '1px solid #e5e5e5', borderRadius: 10, padding: 16 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 12 }}>판매사 TOP 5</div>
+                      <div style={{ background: '#fff', border: '1px solid #e5e5e5', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 10 }}>판매사 TOP 5</div>
                         {market.topSellers.map((s, i) => {
                           const maxVal = market.topSellers[0]?.annual || 1
                           const pct = Math.round((s.annual / maxVal) * 100)
@@ -465,8 +496,7 @@ export default function Home() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                     {items.map(item => (
-                      <div key={item.ITEM_SEQ}
-                        onClick={() => setSelected(item)}
+                      <div key={item.ITEM_SEQ} onClick={() => setSelected(item)}
                         style={{ border: '1px solid #e5e5e5', borderRadius: 10, padding: '12px 16px', background: '#fff', cursor: 'pointer', opacity: item.CANCEL_NAME !== '정상' ? 0.6 : 1 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                           <div>
@@ -534,15 +564,11 @@ export default function Home() {
             <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>개발 후보 목록</h1>
             <p style={{ color: '#888', fontSize: 14, marginBottom: 20 }}>성분 단위로 시장성을 분석하고 배치 생산 계획을 수립합니다</p>
 
-            {/* 자체 검색창 */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 24, padding: 16, background: '#f8f8f8', borderRadius: 10 }}>
-              <input
-                value={candQuery}
-                onChange={e => setCandQuery(e.target.value)}
+              <input value={candQuery} onChange={e => setCandQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && searchAndAddCandidate()}
                 placeholder="성분명 입력 후 후보 추가 (예: 나프록센)"
-                style={{ flex: 1, padding: '0 16px', height: 40, border: '1px solid #e5e5e5', borderRadius: 8, fontSize: 14 }}
-              />
+                style={{ flex: 1, padding: '0 16px', height: 40, border: '1px solid #e5e5e5', borderRadius: 8, fontSize: 14 }} />
               <button onClick={searchAndAddCandidate} disabled={candLoading}
                 style={{ padding: '0 20px', height: 40, background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer', fontWeight: 600 }}>
                 {candLoading ? '검색 중...' : '＋ 추가'}
@@ -557,33 +583,24 @@ export default function Home() {
               </div>
             ) : (
               <>
-                {/* 목차형 헤더 */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1.5fr 0.8fr 40px', gap: 8, padding: '8px 16px', background: '#f0f0f0', borderRadius: 8, fontSize: 11, color: '#888', fontWeight: 600, marginBottom: 8 }}>
-                  <span>성분명</span>
-                  <span>시장규모</span>
-                  <span>단일/복합</span>
-                  <span>최저/평균가</span>
-                  <span>시장 1위</span>
-                  <span>추가일</span>
-                  <span></span>
+                  <span>성분명</span><span>시장규모</span><span>단일/복합</span><span>최저/평균가</span><span>시장 1위</span><span>추가일</span><span></span>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {candidates.map((c) => {
                     const isExpanded = expandedCandidate === c.ingredient
                     const topSeller = c.market?.topSellers?.[0]
-                    const totalTopSales = c.market?.topSellers?.reduce((s, t) => s + t.annual, 0) || 0
 
                     return (
                       <div key={c.ingredient} style={{ border: '1px solid #e5e5e5', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
 
                         {/* 목차 행 */}
-                        <div
-                          onClick={() => setExpandedCandidate(isExpanded ? null : c.ingredient)}
+                        <div onClick={() => setExpandedCandidate(isExpanded ? null : c.ingredient)}
                           style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1.5fr 0.8fr 40px', gap: 8, padding: '14px 16px', cursor: 'pointer', alignItems: 'center', background: isExpanded ? '#f8faff' : '#fff' }}>
-                          <div style={{ fontWeight: 700, fontSize: 15, color: '#111' }}>{c.ingredient}</div>
+                          <div style={{ fontWeight: 700, fontSize: 15 }}>{c.ingredient}</div>
                           <div style={{ fontSize: 14, fontWeight: 600, color: '#1a4a7a' }}>
-                            {c.market.annualMarket > 0 ? `${(c.market.annualMarket / 100000000).toFixed(1)}억` : '-'}
+                            {(c.market.annualMarket / 100000000).toFixed(1)}억
                           </div>
                           <div style={{ fontSize: 12 }}>
                             <span style={{ background: '#dbeafe', color: '#1e40af', borderRadius: 4, padding: '2px 6px', marginRight: 4 }}>단일 {c.market.singleCount}</span>
@@ -602,51 +619,52 @@ export default function Home() {
                             ) : '-'}
                           </div>
                           <div style={{ fontSize: 11, color: '#888' }}>{c.addedAt}</div>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <span style={{ fontSize: 14, color: '#888' }}>{isExpanded ? '▲' : '▼'}</span>
-                          </div>
+                          <span style={{ fontSize: 14, color: '#888' }}>{isExpanded ? '▲' : '▼'}</span>
                         </div>
 
-                        {/* 펼침 상세 */}
+                        {/* 펼침 */}
                         {isExpanded && (
                           <div style={{ padding: '0 16px 16px', borderTop: '1px solid #e5e5e5' }}>
 
-                            {/* 포장단위별 */}
+                            {/* 포장단위별 — 클릭하면 해당 규격 시장 펼침 */}
                             {c.market.packUnits && c.market.packUnits.length > 0 && (
-                              <div style={{ marginTop: 16, marginBottom: 16 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📦 포장단위별 공급가</div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6, fontSize: 11, color: '#888', padding: '0 4px', marginBottom: 4 }}>
-                                  <span>규격</span><span>수량</span><span>포장</span><span>최저가</span><span>평균가</span>
+                              <div style={{ marginTop: 16, marginBottom: 8 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📦 포장단위별 시장 (클릭하면 상세 분석)</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr', gap: 6, fontSize: 11, color: '#888', padding: '0 4px', marginBottom: 4 }}>
+                                  <span>규격</span><span>수량</span><span>포장</span><span>최저가</span><span>평균가</span><span>규격시장</span>
                                 </div>
-{c.market.packUnits.map((p, i) => {
-                                  const isSelected = expandedCandidate === c.ingredient && selectedPack?.spec === p.spec && selectedPack?.qty === p.qty && selectedPack?.pkg === p.pkg
+                                {c.market.packUnits.map((p, i) => {
+                                  const packKey = `${c.ingredient}-${p.spec}-${p.qty}-${p.pkg}`
+                                  const isPackExpanded = expandedPack === packKey
                                   return (
-                                    <div key={i}
-                                      onClick={() => setSelectedPack(isSelected ? null : p)}
-                                      style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6, padding: '7px 4px', borderTop: '1px solid #f0f0f0', fontSize: 13, alignItems: 'center', cursor: 'pointer', background: isSelected ? '#f0f7ff' : 'transparent', borderRadius: 6 }}>
-                                      <span style={{ fontWeight: 600, color: isSelected ? '#1a4a7a' : '#111' }}>{p.spec}</span>
-                                      <span style={{ color: '#666' }}>{p.qty}개</span>
-                                      <span style={{ color: '#666' }}>{p.pkg}</span>
-                                      <span style={{ color: '#ef4444', fontWeight: 600 }}>{p.minPrice.toLocaleString()}원</span>
-                                      <span style={{ color: '#3b82f6', fontWeight: 600 }}>{p.avgPrice.toLocaleString()}원 {isSelected ? '✓' : ''}</span>
+                                    <div key={i}>
+                                      <div
+                                        onClick={() => setExpandedPack(isPackExpanded ? null : packKey)}
+                                        style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr', gap: 6, padding: '8px 4px', borderTop: '1px solid #f0f0f0', fontSize: 13, alignItems: 'center', cursor: 'pointer', background: isPackExpanded ? '#f0f7ff' : 'transparent', borderRadius: 6 }}>
+                                        <span style={{ fontWeight: 600, color: isPackExpanded ? '#1a4a7a' : '#111' }}>{p.spec}</span>
+                                        <span style={{ color: '#666' }}>{p.qty}개</span>
+                                        <span style={{ color: '#666' }}>{p.pkg}</span>
+                                        <span style={{ color: '#ef4444', fontWeight: 600 }}>{p.minPrice.toLocaleString()}원</span>
+                                        <span style={{ color: '#3b82f6', fontWeight: 600 }}>{p.avgPrice.toLocaleString()}원</span>
+                                        <span style={{ color: '#888', fontSize: 12 }}>{(p.packAnnual / 100000000).toFixed(1)}억 {isPackExpanded ? '▲' : '▼'}</span>
+                                      </div>
+                                      {isPackExpanded && (
+                                        <PackMarketPanel pack={p} annualMarket={c.market.annualMarket} />
+                                      )}
                                     </div>
                                   )
                                 })}
-                                {selectedPack && (
-                                  <div style={{ marginTop: 8, padding: '8px 12px', background: '#f0f7ff', borderRadius: 8, fontSize: 12, color: '#1a4a7a', fontWeight: 600 }}>
-                                    📦 선택된 규격: {selectedPack.spec} / {selectedPack.qty}개 {selectedPack.pkg} — 배치계산기에 가격이 자동 반영됩니다
-                                  </div>
-                                )}
                               </div>
                             )}
 
-                            {/* 시장 점유율 */}
+                            {/* 전체 성분 시장 점유율 */}
                             {c.market.topSellers.length > 0 && (
-                              <div style={{ marginBottom: 16 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📊 시장 점유율</div>
+                              <div style={{ marginTop: 16, marginBottom: 16 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📊 전체 성분 시장 점유율</div>
                                 {c.market.topSellers.map((s, i) => {
-                                  const sharePct = totalTopSales > 0 ? (s.annual / totalTopSales * 100) : 0
-                                  const key = `${c.ingredient}-${s.name}`
+                                  const totalSales = c.market.topSellers.reduce((sum, t) => sum + t.annual, 0)
+                                  const sharePct = totalSales > 0 ? s.annual / totalSales * 100 : 0
+                                  const key = `${c.ingredient}-overall-${s.name}`
                                   const isSellerExpanded = expandedSeller === key
                                   const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
                                   return (
@@ -664,12 +682,16 @@ export default function Home() {
                                           <div style={{ background: '#e5e5e5', borderRadius: 4, height: 5 }}>
                                             <div style={{ background: colors[i], borderRadius: 4, height: 5, width: `${sharePct}%` }} />
                                           </div>
+                                          <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+                                            <span style={{ fontSize: 11, color: '#ef4444' }}>최저 {s.minPrice.toLocaleString()}원</span>
+                                            <span style={{ fontSize: 11, color: '#3b82f6' }}>평균 {s.avgPrice.toLocaleString()}원</span>
+                                          </div>
                                         </div>
                                         <span style={{ fontSize: 11, color: '#888' }}>{isSellerExpanded ? '▲' : '계산기 ▼'}</span>
                                       </div>
-{isSellerExpanded && (
+                                      {isSellerExpanded && (
                                         <BatchCalculator
-                                          medianPrice={selectedPack ? selectedPack.avgPrice : c.market.medianPrice}
+                                          medianPrice={s.avgPrice}
                                           marketShare={sharePct}
                                           annualMarket={c.market.annualMarket}
                                         />
@@ -680,17 +702,16 @@ export default function Home() {
                               </div>
                             )}
 
-                            {/* 내가 진입한다면 */}
+                            {/* 내가 5% 진입 */}
                             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: 16 }}>
-                              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, color: '#92400e' }}>💡 내가 5% 점유한다면?</div>
-<BatchCalculator
-                                medianPrice={selectedPack ? selectedPack.avgPrice : c.market.medianPrice}
+                              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, color: '#92400e' }}>💡 전체 시장에서 5% 점유한다면?</div>
+                              <BatchCalculator
+                                medianPrice={c.market.medianPrice}
                                 marketShare={5}
                                 annualMarket={c.market.annualMarket}
                               />
                             </div>
 
-                            {/* 제거 버튼 */}
                             <button onClick={() => removeCandidate(c.ingredient)}
                               style={{ marginTop: 12, padding: '6px 16px', background: 'none', border: '1px solid #e5e5e5', borderRadius: 6, fontSize: 12, color: '#888', cursor: 'pointer' }}>
                               후보에서 제거
