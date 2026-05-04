@@ -11,12 +11,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    let query = supabase.from('drug_supply').select('*')
+    let query = supabase.from('drug_supply_view').select('*')
 
     if (ingredientKo) {
-      query = query.ilike('성분명', `%${ingredientKo}%`)
+      query = query.ilike('ingredient_ko', `%${ingredientKo}%`)
     } else if (ingredientEng) {
-      query = query.ilike('성분명(영문)', `%${ingredientEng}%`)
+      query = query.ilike('ingredient_eng', `%${ingredientEng}%`)
     }
 
     const { data, error } = await query
@@ -24,13 +24,12 @@ export async function GET(req: NextRequest) {
 
     const items = data || []
 
-    // 월별 컬럼 목록
     const monthCols = [
-      '2025-01','2025-02','2025-03','2025-04','2025-05','2025-06',
-      '2025-07','2025-08','2025-09','2025-10','2025-11','2025-12','2026-01'
+      'm202501','m202502','m202503','m202504','m202505','m202506',
+      'm202507','m202508','m202509','m202510','m202511','m202512','m202601'
     ]
 
-    // 각 품목의 월 합산 → 전체 연간 시장규모
+    // 연간 시장규모
     const annualMarket = items.reduce((sum, item) => {
       const itemTotal = monthCols.reduce((s, col) => s + (Number(item[col]) || 0), 0)
       return sum + itemTotal
@@ -39,17 +38,17 @@ export async function GET(req: NextRequest) {
     // 공급가 중앙값
     const prices = items
       .map(i => {
-        const raw = String(i['공급가(중앙값)'] || '').replace(/,/g, '')
+        const raw = String(i.supply_price_median || '').replace(/,/g, '')
         return Number(raw)
       })
       .filter(p => p > 0)
       .sort((a, b) => a - b)
     const medianPrice = prices.length > 0 ? prices[Math.floor(prices.length / 2)] : 0
 
-    // 판매사 TOP5 (월별 합산 기준)
+    // 판매사 TOP5
     const sellerMap = new Map<string, number>()
     items.forEach(item => {
-      const seller = item['판매사명'] || '기타'
+      const seller = item.seller_name || '기타'
       const itemTotal = monthCols.reduce((s, col) => s + (Number(item[col]) || 0), 0)
       sellerMap.set(seller, (sellerMap.get(seller) || 0) + itemTotal)
     })
@@ -58,11 +57,10 @@ export async function GET(req: NextRequest) {
       .slice(0, 5)
       .map(([name, annual]) => ({ name, annual }))
 
-    // ATC3 코드 (가장 많은 것)
+    // ATC3 코드
     const atcMap = new Map<string, number>()
     items.forEach(i => {
-      const atc = i['ATC3_코드명']
-      if (atc) atcMap.set(atc, (atcMap.get(atc) || 0) + 1)
+      if (i.atc3_name) atcMap.set(i.atc3_name, (atcMap.get(i.atc3_name) || 0) + 1)
     })
     const topAtc = Array.from(atcMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || ''
 
