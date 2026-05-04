@@ -139,6 +139,7 @@ export default function Home() {
   const [toast, setToast] = useState('')
   const [expandedCandidate, setExpandedCandidate] = useState<string | null>(null)
   const [expandedSeller, setExpandedSeller] = useState<string | null>(null)
+  const [selectedPack, setSelectedPack] = useState<PackUnit | null>(null)
 
   // 개발후보 자체 검색
   const [candQuery, setCandQuery] = useState('')
@@ -617,15 +618,25 @@ export default function Home() {
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6, fontSize: 11, color: '#888', padding: '0 4px', marginBottom: 4 }}>
                                   <span>규격</span><span>수량</span><span>포장</span><span>최저가</span><span>평균가</span>
                                 </div>
-                                {c.market.packUnits.map((p, i) => (
-                                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6, padding: '7px 4px', borderTop: '1px solid #f0f0f0', fontSize: 13, alignItems: 'center' }}>
-                                    <span style={{ fontWeight: 600 }}>{p.spec}</span>
-                                    <span style={{ color: '#666' }}>{p.qty}개</span>
-                                    <span style={{ color: '#666' }}>{p.pkg}</span>
-                                    <span style={{ color: '#ef4444', fontWeight: 600 }}>{p.minPrice.toLocaleString()}원</span>
-                                    <span style={{ color: '#3b82f6', fontWeight: 600 }}>{p.avgPrice.toLocaleString()}원</span>
+{c.market.packUnits.map((p, i) => {
+                                  const isSelected = expandedCandidate === c.ingredient && selectedPack?.spec === p.spec && selectedPack?.qty === p.qty && selectedPack?.pkg === p.pkg
+                                  return (
+                                    <div key={i}
+                                      onClick={() => setSelectedPack(isSelected ? null : p)}
+                                      style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6, padding: '7px 4px', borderTop: '1px solid #f0f0f0', fontSize: 13, alignItems: 'center', cursor: 'pointer', background: isSelected ? '#f0f7ff' : 'transparent', borderRadius: 6 }}>
+                                      <span style={{ fontWeight: 600, color: isSelected ? '#1a4a7a' : '#111' }}>{p.spec}</span>
+                                      <span style={{ color: '#666' }}>{p.qty}개</span>
+                                      <span style={{ color: '#666' }}>{p.pkg}</span>
+                                      <span style={{ color: '#ef4444', fontWeight: 600 }}>{p.minPrice.toLocaleString()}원</span>
+                                      <span style={{ color: '#3b82f6', fontWeight: 600 }}>{p.avgPrice.toLocaleString()}원 {isSelected ? '✓' : ''}</span>
+                                    </div>
+                                  )
+                                })}
+                                {selectedPack && (
+                                  <div style={{ marginTop: 8, padding: '8px 12px', background: '#f0f7ff', borderRadius: 8, fontSize: 12, color: '#1a4a7a', fontWeight: 600 }}>
+                                    📦 선택된 규격: {selectedPack.spec} / {selectedPack.qty}개 {selectedPack.pkg} — 배치계산기에 가격이 자동 반영됩니다
                                   </div>
-                                ))}
+                                )}
                               </div>
                             )}
 
@@ -656,9 +667,9 @@ export default function Home() {
                                         </div>
                                         <span style={{ fontSize: 11, color: '#888' }}>{isSellerExpanded ? '▲' : '계산기 ▼'}</span>
                                       </div>
-                                      {isSellerExpanded && (
+{isSellerExpanded && (
                                         <BatchCalculator
-                                          medianPrice={c.market.medianPrice}
+                                          medianPrice={selectedPack ? selectedPack.avgPrice : c.market.medianPrice}
                                           marketShare={sharePct}
                                           annualMarket={c.market.annualMarket}
                                         />
@@ -672,8 +683,8 @@ export default function Home() {
                             {/* 내가 진입한다면 */}
                             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: 16 }}>
                               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4, color: '#92400e' }}>💡 내가 5% 점유한다면?</div>
-                              <BatchCalculator
-                                medianPrice={c.market.medianPrice}
+<BatchCalculator
+                                medianPrice={selectedPack ? selectedPack.avgPrice : c.market.medianPrice}
                                 marketShare={5}
                                 annualMarket={c.market.annualMarket}
                               />
