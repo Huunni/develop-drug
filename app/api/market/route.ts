@@ -37,13 +37,12 @@ export async function GET(req: NextRequest) {
 
     // 공급가 중앙값
     const prices = items
-      .map(i => {
-        const raw = String(i.supply_price_median || '').replace(/,/g, '')
-        return Number(raw)
-      })
+      .map(i => Number(String(i.supply_price_median || '0').replace(/,/g, '')))
       .filter(p => p > 0)
       .sort((a, b) => a - b)
     const medianPrice = prices.length > 0 ? prices[Math.floor(prices.length / 2)] : 0
+    const minPrice = prices.length > 0 ? prices[0] : 0
+    const avgPrice = prices.length > 0 ? Math.round(prices.reduce((s, p) => s + p, 0) / prices.length) : 0
 
     // 판매사 TOP5
     const sellerMap = new Map<string, number>()
@@ -57,6 +56,36 @@ export async function GET(req: NextRequest) {
       .slice(0, 5)
       .map(([name, annual]) => ({ name, annual }))
 
+    // 포장단위별 가격 정보
+    const packMap = new Map<string, { prices: number[], count: number }>()
+    items.forEach(item => {
+      const spec = item.item_standard || '-'
+      const qty = item.total_quantity || ''
+      const pkg = item.package_type || ''
+      const key = `${spec}||${qty}||${pkg}`
+      const price = Number(String(item.supply_price_median || '0').replace(/,/g, ''))
+      if (!packMap.has(key)) packMap.set(key, { prices: [], count: 0 })
+      const entry = packMap.get(key)!
+      if (price > 0) entry.prices.push(price)
+      entry.count++
+    })
+
+    const packUnits = Array.from(packMap.entries())
+      .map(([key, val]) => {
+        const [spec, qty, pkg] = key.split('||')
+        const sortedP = val.prices.sort((a, b) => a - b)
+        return {
+          spec,
+          qty,
+          pkg,
+          minPrice: sortedP[0] || 0,
+          avgPrice: sortedP.length > 0 ? Math.round(sortedP.reduce((s, p) => s + p, 0) / sortedP.length) : 0,
+          count: val.count,
+        }
+      })
+      .filter(p => p.minPrice > 0)
+      .sort((a, b) => a.spec.localeCompare(b.spec))
+
     // ATC3 코드
     const atcMap = new Map<string, number>()
     items.forEach(i => {
@@ -64,13 +93,22 @@ export async function GET(req: NextRequest) {
     })
     const topAtc = Array.from(atcMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || ''
 
+    // 단일/복합 구분
+    const singleCount = items.filter(i => i.single_complex === '단일').length
+    const complexCount = items.filter(i => i.single_complex === '복합').length
+
     return NextResponse.json({
       totalItems: items.length,
       annualMarket,
       medianPrice,
+      minPrice,
+      avgPrice,
       topSellers,
       topAtc,
       latestPeriod: '2026-01',
+      packUnits,
+      singleCount,
+      complexCount,
     })
 
   } catch (error: any) {
