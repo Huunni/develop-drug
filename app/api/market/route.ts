@@ -14,9 +14,9 @@ export async function GET(req: NextRequest) {
     let query = supabase.from('drug_supply').select('*')
 
     if (ingredientKo) {
-      query = query.ilike('ingredient_ko', `%${ingredientKo}%`)
+      query = query.ilike('성분명', `%${ingredientKo}%`)
     } else if (ingredientEng) {
-      query = query.ilike('ingredient_eng', `%${ingredientEng}%`)
+      query = query.ilike('성분명(영문)', `%${ingredientEng}%`)
     }
 
     const { data, error } = await query
@@ -24,44 +24,55 @@ export async function GET(req: NextRequest) {
 
     const items = data || []
 
-    // 연간 시장규모 (월평균 × 12 합산)
-    const totalMonthlyAvg = items.reduce((sum, i) => sum + (i.monthly_avg || 0), 0)
-    const annualMarket = totalMonthlyAvg * 12
+    // 월별 컬럼 목록
+    const monthCols = [
+      '2025-01','2025-02','2025-03','2025-04','2025-05','2025-06',
+      '2025-07','2025-08','2025-09','2025-10','2025-11','2025-12','2026-01'
+    ]
 
-    // 공급가 중앙값 (0 제외)
-    const prices = items.map(i => i.supply_price || 0).filter(p => p > 0).sort((a, b) => a - b)
+    // 각 품목의 월 합산 → 전체 연간 시장규모
+    const annualMarket = items.reduce((sum, item) => {
+      const itemTotal = monthCols.reduce((s, col) => s + (Number(item[col]) || 0), 0)
+      return sum + itemTotal
+    }, 0)
+
+    // 공급가 중앙값
+    const prices = items
+      .map(i => {
+        const raw = String(i['공급가(중앙값)'] || '').replace(/,/g, '')
+        return Number(raw)
+      })
+      .filter(p => p > 0)
+      .sort((a, b) => a - b)
     const medianPrice = prices.length > 0 ? prices[Math.floor(prices.length / 2)] : 0
 
-    // 상위 판매사 TOP5
+    // 판매사 TOP5 (월별 합산 기준)
     const sellerMap = new Map<string, number>()
-    items.forEach(i => {
-      const seller = i.seller_name || '기타'
-      sellerMap.set(seller, (sellerMap.get(seller) || 0) + (i.monthly_avg || 0))
+    items.forEach(item => {
+      const seller = item['판매사명'] || '기타'
+      const itemTotal = monthCols.reduce((s, col) => s + (Number(item[col]) || 0), 0)
+      sellerMap.set(seller, (sellerMap.get(seller) || 0) + itemTotal)
     })
     const topSellers = Array.from(sellerMap.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
-      .map(([name, monthly_avg]) => ({ name, monthly_avg, annual: monthly_avg * 12 }))
+      .map(([name, annual]) => ({ name, annual }))
 
-    // ATC 코드 (가장 많은 것)
+    // ATC3 코드 (가장 많은 것)
     const atcMap = new Map<string, number>()
     items.forEach(i => {
-      if (i.atc3_code) atcMap.set(i.atc3_code, (atcMap.get(i.atc3_code) || 0) + 1)
+      const atc = i['ATC3_코드명']
+      if (atc) atcMap.set(atc, (atcMap.get(atc) || 0) + 1)
     })
     const topAtc = Array.from(atcMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || ''
-
-    // 데이터 기간
-    const periods = items.map(i => i.data_end).filter(Boolean).sort()
-    const latestPeriod = periods[periods.length - 1] || ''
 
     return NextResponse.json({
       totalItems: items.length,
       annualMarket,
-      totalMonthlyAvg,
       medianPrice,
       topSellers,
       topAtc,
-      latestPeriod,
+      latestPeriod: '2026-01',
     })
 
   } catch (error: any) {
